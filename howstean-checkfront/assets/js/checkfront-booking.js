@@ -33,6 +33,7 @@
       maxQty: 60,
       slip: null,
       rated: null,
+      itemName: null,
       timeslots: [],
       baseSlip: null,
       selectedTimeslotIndex: 0,
@@ -189,150 +190,19 @@
     checkBtn = createEl('button', { type: 'button', class: 'hcf-check-btn' }, ['Check Availability & Price']);
     wrapper.appendChild(checkBtn);
 
-// Now that checkBtn exists, attach the handler
-checkBtn.addEventListener('click', function () {
-  if (!dateInput.value) {
-    alert('Please choose a date.');
-    return;
-  }
-  loadAvailability();
-});
-
     // Availability box
     availabilityBox = createEl('div', { class: 'hcf-availability' });
     wrapper.appendChild(availabilityBox);
-    
-    // ===== Booking form =====
+
+    // ===== Booking form (populated dynamically from Checkfront) =====
     bookingForm = createEl('div', { class: 'hcf-booking-form' });
     bookingForm.style.display = 'none';
     bookingForm.appendChild(createEl('h3', null, ['Your Details']));
 
-    // Two-column layout container
-    var cols = createEl('div', { class: 'hcf-two-cols' });
-    var colLeft = createEl('div', { class: 'hcf-col hcf-col-left' });
-    var colRight = createEl('div', { class: 'hcf-col hcf-col-right' });
+    var dynamicFieldsContainer = createEl('div', { class: 'hcf-dynamic-fields' });
+    bookingForm.appendChild(dynamicFieldsContainer);
 
-    function field(labelText, id, type) {
-      var g = createEl('div', { class: 'hcf-field-group' });
-      g.appendChild(createEl('label', { for: id }, [labelText]));
-      g.appendChild(createEl('input', { type: type || 'text', id: id }));
-      return g;
-    }
-
-    // Left column fields (match Checkfront form)
-    colLeft.appendChild(field('First Name *', 'hcf-first-name', 'text'));
-    colLeft.appendChild(field('Surname *', 'hcf-last-name', 'text'));
-    colLeft.appendChild(field('E-mail *', 'hcf-email', 'email'));
-    colLeft.appendChild(field('Phone *', 'hcf-phone', 'tel'));
-    colLeft.appendChild(field('Company Name', 'hcf-company', 'text'));
-    colLeft.appendChild(field('First Line Billing Address *', 'hcf-address', 'text'));
-    colLeft.appendChild(field('Town/City *', 'hcf-city', 'text'));
-    colLeft.appendChild(field('Postal / Zip *', 'hcf-postal', 'text'));
-
-    // Right column fields
-    // Country is hidden / forced to GB, but we show a disabled text so user sees UK.
-    var countryGroup = createEl('div', { class: 'hcf-field-group' });
-    countryGroup.appendChild(createEl('label', { for: 'hcf-country-display' }, ['Country *']));
-    var countryDisplay = createEl('input', {
-      type: 'text',
-      id: 'hcf-country-display',
-      value: 'United Kingdom',
-      disabled: 'disabled'
-    });
-    var countryHidden = createEl('input', {
-      type: 'hidden',
-      id: 'hcf-country',
-      value: 'GB'
-    });
-    countryGroup.appendChild(countryDisplay);
-    countryGroup.appendChild(countryHidden);
-    colRight.appendChild(countryGroup);
-
-    // County (Region) select
-    var countyGroup = createEl('div', { class: 'hcf-field-group' });
-    countyGroup.appendChild(createEl('label', { for: 'hcf-county' }, ['County *']));
-    var countySelect = createEl('select', { id: 'hcf-county' });
-    countySelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
-    function addCounty(value, label) {
-      countySelect.appendChild(createEl('option', { value: value }, [label]));
-    }
-    addCounty('NYK', 'North Yorkshire, England');
-    addCounty('WYK', 'West Yorkshire, England');
-    addCounty('LND', 'London, England');
-    addCounty('LAN', 'Lancashire, England');
-    addCounty('CMA', 'Cumbria, England');
-    addCounty('DBY', 'Derbyshire, England');
-    addCounty('NFK', 'Norfolk, England');
-    addCounty('NTH', 'Northamptonshire, England');
-    addCounty('NTT', 'Nottinghamshire, England');
-    addCounty('OXF', 'Oxfordshire, England');
-    countyGroup.appendChild(countySelect);
-    colRight.appendChild(countyGroup);
-
-    // How did you hear about us
-    var hearGroup = createEl('div', { class: 'hcf-field-group' });
-    hearGroup.appendChild(createEl('label', { for: 'hcf-hear' }, ['How Did You Hear About Us? *']));
-    var hearSelect = createEl('select', { id: 'hcf-hear' });
-    hearSelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
-    hearSelect.appendChild(createEl('option', { value: 'search_engine' }, ['Search Engine']));
-    hearSelect.appendChild(createEl('option', { value: 'social_media' }, ['Social Media']));
-    hearSelect.appendChild(createEl('option', { value: 'friend_family' }, ['Friend / Family']));
-    hearSelect.appendChild(createEl('option', { value: 'other' }, ['Other']));
-    hearGroup.appendChild(hearSelect);
-    colRight.appendChild(hearGroup);
-
-    // Other please specify
-    var otherGroup = createEl('div', { class: 'hcf-field-group' });
-    otherGroup.appendChild(createEl('label', { for: 'hcf-other' }, ['Other (please specify)']));
-    var otherInput = createEl('input', { type: 'text', id: 'hcf-other' });
-    otherGroup.appendChild(otherInput);
-    colRight.appendChild(otherGroup);
-
-    // Search engine term
-    var searchGroup = createEl('div', { class: 'hcf-field-group' });
-    searchGroup.appendChild(createEl('label', { for: 'hcf-search' }, ['Search Engine (can you remember your search term?)']));
-    var searchInput = createEl('input', { type: 'text', id: 'hcf-search' });
-    searchGroup.appendChild(searchInput);
-    colRight.appendChild(searchGroup);
-
-    // Guest type
-    var guestGroup = createEl('div', { class: 'hcf-field-group' });
-    guestGroup.appendChild(createEl('label', { for: 'hcf-guest-type' }, ['Guest Type *']));
-    var guestSelect = createEl('select', { id: 'hcf-guest-type' });
-    guestSelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
-    guestSelect.appendChild(createEl('option', { value: 'adult' }, ['Adult']));
-    guestSelect.appendChild(createEl('option', { value: 'youth' }, ['Youth']));
-    guestSelect.appendChild(createEl('option', { value: 'group' }, ['Group']));
-    guestGroup.appendChild(guestSelect);
-    colRight.appendChild(guestGroup);
-
-    cols.appendChild(colLeft);
-    cols.appendChild(colRight);
-    bookingForm.appendChild(cols);
-
-    // Full-width bottom section: Terms & Conditions + Email opt-in
-    var bottomBlock = createEl('div', { class: 'hcf-bottom-block' });
-
-    var tcGroup = createEl('div', { class: 'hcf-field-group hcf-field-terms' });
-    var tcLabel = createEl('label', null, []);
-    var tcCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-tc' });
-    tcLabel.appendChild(tcCheckbox);
-    tcLabel.appendChild(createEl('strong', null, ['I have read and agreed to the Terms of Service']));
-    tcGroup.appendChild(tcLabel);
-    tcGroup.appendChild(createEl('p', { class: 'hcf-help' }, ['If not tell customer they must do this now, if we dont hear back by the end of working day we presume they are happy to proceed.']));
-    bottomBlock.appendChild(tcGroup);
-
-    var optGroup = createEl('div', { class: 'hcf-field-group hcf-field-optin' });
-    var optLabel = createEl('label', null, []);
-    var optCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-email-optin' });
-    optLabel.appendChild(optCheckbox);
-    optLabel.appendChild(createEl('strong', null, ['Keep up to date with our latest offers and events, by joining our friends list here']));
-    optGroup.appendChild(optLabel);
-    bottomBlock.appendChild(optGroup);
-
-    bookingForm.appendChild(bottomBlock);
-
-    // Book button
+    // Book button (enabled after we have a slip + form fields)
     bookBtn = createEl('button', { type: 'button', class: 'hcf-book-btn', disabled: 'disabled' }, ['Complete Booking & Pay']);
     bookingForm.appendChild(bookBtn);
     wrapper.appendChild(bookingForm);
@@ -380,6 +250,70 @@ checkBtn.addEventListener('click', function () {
       checkBtn.disabled = isLoading;
       bookBtn.disabled = isLoading || !state.slip;
       checkBtn.textContent = isLoading ? 'Checking…' : 'Check Availability & Price';
+    }
+
+    function buildFieldControl(name, field) {
+      var type = (field.type || 'text').toLowerCase();
+      var id = 'hcf-field-' + name;
+      var input;
+
+      if (type === 'select' && field.options) {
+        input = createEl('select', { id: id, 'data-field-name': name });
+        input.appendChild(createEl('option', { value: '' }, ['Please Select']));
+        var opts = field.options;
+        if (Array.isArray(opts)) {
+          opts.forEach(function (opt) {
+            var v = typeof opt === 'object' ? opt.value : opt;
+            var lbl = typeof opt === 'object' ? (opt.label || opt.name || opt.value) : opt;
+            input.appendChild(createEl('option', { value: v }, [lbl]));
+          });
+        } else if (typeof opts === 'object') {
+          Object.keys(opts).forEach(function (k) {
+            input.appendChild(createEl('option', { value: k }, [opts[k]]));
+          });
+        }
+      } else if (type === 'checkbox') {
+        input = createEl('input', { type: 'checkbox', id: id, 'data-field-name': name, value: '1' });
+      } else if (type === 'textarea') {
+        input = createEl('textarea', { id: id, 'data-field-name': name });
+      } else {
+        input = createEl('input', { type: type, id: id, 'data-field-name': name });
+      }
+
+      if (field.required) {
+        input.setAttribute('required', 'required');
+      }
+
+      return input;
+    }
+
+    function renderDynamicFields(params) {
+      if (!dynamicFieldsContainer) return;
+      dynamicFieldsContainer.innerHTML = '';
+
+      if (!params || typeof params !== 'object') {
+        return;
+      }
+
+      Object.keys(params).forEach(function (name) {
+        var field = params[name] || {};
+        var group = createEl('div', { class: 'hcf-field-group' });
+
+        var labelText = field.label || name;
+        if (field.required) {
+          labelText += ' *';
+        }
+        group.appendChild(createEl('label', { for: 'hcf-field-' + name }, [labelText]));
+
+        var control = buildFieldControl(name, field);
+        group.appendChild(control);
+
+        if (field.instructions) {
+          group.appendChild(createEl('p', { class: 'hcf-help' }, [field.instructions]));
+        }
+
+        dynamicFieldsContainer.appendChild(group);
+      });
     }
 
     // Convert Date -> "YYYYMMDD"
@@ -539,7 +473,7 @@ checkBtn.addEventListener('click', function () {
     function showRated(data) {
       availabilityBox.innerHTML = '';
 
-// update title text
+    // update title text
 var titleNode = document.querySelector(".hcf-activity-title");
 if (titleNode && state.itemName) {
     titleNode.textContent = state.itemName;
@@ -551,9 +485,11 @@ if (titleNode && state.itemName) {
       }
 
       var item = data.item;
-      
+
 // store item name
 state.itemName = item.name || "";
+
+      renderDynamicFields(item.param || {});
 
 
       if (item.rules && typeof item.rules === 'string') {
@@ -577,7 +513,7 @@ state.itemName = item.name || "";
         availabilityBox.textContent = 'No rated response from Checkfront.';
         return;
       }
-      
+
 
       // Save rated data and base slip
       state.rated = item;
@@ -667,21 +603,19 @@ state.itemName = item.name || "";
       if (rate.summary) {
         var s = rate.summary;
         var ul = createEl('ul');
-        
+
             // ⭐ Add Event Title at top
     if (state.itemName) {
         ul.appendChild(createEl('li', null, ['Event: ' + state.itemName]));
     }
-    
+
         if (s.date)  ul.appendChild(createEl('li', null, ['Date: ' + s.date]));
 
         // Show currently selected time slot (if any)
         if (state.timeslots && state.timeslots.length) {
-          var selIndex = (typeof state.selectedTimeslotIndex === 'number' &&
-                          state.selectedTimeslotIndex >= 0 &&
-                          state.selectedTimeslotIndex < state.timeslots.length)
-                        ? state.selectedTimeslotIndex
-                        : 0;
+          var selIndex = typeof state.selectedTimeslotIndex === 'number'
+                         ? state.selectedTimeslotIndex
+                         : 0;
           var tsSel = state.timeslots[selIndex];
           if (tsSel) {
             var start = tsSel.start_time || '';
@@ -699,7 +633,7 @@ state.itemName = item.name || "";
           tmp.innerHTML = s.details;
           ul.appendChild(createEl('li', null, ['Details: ' + tmp.textContent]));
         }
-        
+
 
         if (s.price && s.price.total) {
           var p = document.createElement('div');
@@ -789,65 +723,43 @@ state.itemName = item.name || "";
         alert('Please check availability first.');
         return;
       }
+      var formFields = dynamicFieldsContainer ? dynamicFieldsContainer.querySelectorAll('[data-field-name]') : [];
+      var formPayload = {};
+      var missing = [];
 
-      function v(id) {
-        var el = document.getElementById(id);
-        return el ? el.value.trim() : '';
-      }
+      Array.prototype.forEach.call(formFields, function (el) {
+        var name = el.getAttribute('data-field-name');
+        var value = '';
+        var tag = el.tagName.toLowerCase();
+        var type = (el.getAttribute('type') || '').toLowerCase();
 
-      var firstName = v('hcf-first-name');
-      var lastName  = v('hcf-last-name');
-      var phone     = v('hcf-phone');
-      var company   = v('hcf-company');
-      var address   = v('hcf-address');
-      var city      = v('hcf-city');
-      var postal    = v('hcf-postal');
-      var country   = v('hcf-country');
-      var county    = countySelect.value;
-      var hear      = hearSelect.value;
-      var other     = v('hcf-other');
-      var search    = v('hcf-search');
-      var guestType = guestSelect.value;
-      var tcChecked = document.getElementById('hcf-tc') ? document.getElementById('hcf-tc').checked : false;
-      var emailOptinChecked = document.getElementById('hcf-email-optin') ? document.getElementById('hcf-email-optin').checked : false;
+        if (type === 'checkbox') {
+          value = el.checked ? (el.value || '1') : '';
+        } else if (tag === 'select') {
+          value = el.value;
+        } else {
+          value = (el.value || '').trim();
+        }
 
-      var email = v('hcf-email');
+        if (el.required && !value) {
+          missing.push(name);
+        }
 
-      if (!firstName || !lastName || !email || !phone || !address || !city || !postal || !country || !county || !hear || !guestType) {
-        alert('Please fill in all required fields.');
+        formPayload[name] = value;
+      });
+
+      if (missing.length) {
+        alert('Please fill in all required fields: ' + missing.join(', '));
         return;
       }
-      if (hear === 'other' && !other) {
-        alert('Please specify how you heard about us.');
-        return;
-      }
-      if (!tcChecked) {
-        alert('You must agree to the Terms & Conditions.');
-        return;
-      }
+
+      var tosAgreed = formPayload.customer_tos_agree === '1' || formPayload.customer_tos_agree === 1 || formPayload.customer_tos_agree === true;
 
       var payload = {
-        policy: { customer_tos_agree: tcChecked ? 1 : 0 },
+        policy: { customer_tos_agree: tosAgreed ? 1 : 0 },
         slip: state.slip,
-        customer_tos_agree: tcChecked ? 1 : 0,
-        form: {
-          customer_first_name: firstName,
-          customer_last_name:  lastName,
-          customer_email:      email,
-          customer_phone:      phone,
-          company_name:        company,
-          customer_address:    address,
-          customer_city:       city,
-          customer_country:    country,
-          customer_region:     county,
-          customer_postal_zip: postal,
-          how_did_you_hear_about_us: hear,
-          other_please_specify: other,
-          search_engine_google_yahoo_etc: search,
-          guest_type: guestType,
-          customer_email_optin: emailOptinChecked ? '1' : '0',
-          customer_tos_agree: tcChecked ? '1' : '0'
-        }
+        customer_tos_agree: tosAgreed ? 1 : 0,
+        form: formPayload
       };
 
       setLoading(true);
