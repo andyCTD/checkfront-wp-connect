@@ -1,0 +1,272 @@
+/* Calendar shell */
+.hcf-calendar-container {
+  margin-bottom: 1.5rem;
+  border: 1px solid #ddd;
+  padding: 10px 10px 6px;
+  max-width: 520px;
+}
+.hcf-cal-cell.hcf-cal-selected {
+    background: #cbe0c1;
+}
+/* availability button */
+button.hcf-check-btn{
+    margin-bottom: 20px;
+    background-color: #94b314;
+    border-radius: 6px;
+    font-size: 20px;
+    font-family: "Londrina Solid";
+    font-weight: 400;
+    color: var(--bricks-color-dgkwyi);
+    line-height: 1em;
+    text-transform: uppercase;
+    padding: 20px 17px;
+}
+
+button.hcf-check-btn:hover {
+    background: #7b960c;
+}
+
+/* book button */
+button.hcf-book-btn {
+    margin: 0px 20px;
+    background-color: #d62626;
+    border-radius: 6px;
+    font-size: 20px;
+    font-family: "Londrina Solid";
+    font-weight: 400;
+    color: var(--bricks-color-dgkwyi);
+    line-height: 1em;
+    text-transform: uppercase;
+    padding: 20px 17px;
+}
+
+.hcf-two-cols {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-content: flex-start;
+    align-items: flex-start;
+    gap: 0px;
+}
+
+.hcf-col.hcf-col-left {
+    width: 50%;
+padding: 20px;
+}
+.hcf-col.hcf-col-right {
+    width: 50%;
+padding: 20px;
+}
+
+.hcf-field-group {
+    width: 100%;
+}
+.hcf-field-group input, .hcf-field-group select {
+    max-width: unset !important;
+}
+
+@media only screen and (max-width: 600px) {
+
+.hcf-two-cols {
+    flex-direction: column;
+}
+
+.hcf-col.hcf-col-left, .hcf-col.hcf-col-right {
+    width: 100%;
+    padding: 0px;
+}
+
+button.hcf-book-btn {margin: 20px 0px;}
+    
+}
+
+button.hcf-book-btn:hover {
+    background: #ba1f1f;
+}
+
+/* quantity buttons */
+button.hcf-qty-plus, button.hcf-qty-minus {
+    background-color: #d62626;
+    border-radius: 6px;
+    font-size: 20px;
+    font-family: "Londrina Solid";
+    font-weight: 400;
+    color: #ffffff;
+    line-height: 1em;
+    text-transform: uppercase;
+    padding: 5px;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    margin: 2px 5px;
+}
+
+/* availability */
+.hcf-availability {
+    margin-bottom: 40px;
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 6px;
+}
+
+/* Header */
+.hcf-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.howstean-checkfront-wrapper h4 {
+    margin-bottom: 20px;
+}
+.hcf-booking-form h3 {
+    margin-bottom: 20px;
+}
+.hcf-cal-nav {
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.hcf-cal-month-label {
+  flex: 1;
+  text-align: center;
+}
+
+.hcf-field-group {
+    margin-bottom: 20px;
+}
+.hcf-field-group label {
+    color: #686868;
+    font-weight: 400;
+    font-size: 18px;
+}
+
+/* Grid */
+.hcf-cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.hcf-cal-cell {
+  border: 1px solid #eee;
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 0;
+  min-height: 30px;
+}
+
+.hcf-cal-row-head .hcf-cal-cell {
+  background: #f8f8f8;
+  font-weight: 600;
+}
+
+.hcf-cal-empty {
+  background: #fdfdfd;
+}
+
+/* States */
+.hcf-cal-day {
+  cursor: pointer;
+}
+
+.hcf-cal-available {
+  background: #e3f6d9; /* light green */
+}
+
+.hcf-cal-soldout {
+  background: #fbd7d0; /* light red/orange */
+}
+
+.hcf-cal-closed {
+  background: #f3f3f3;
+  color: #bbb;
+  cursor: default;
+}
+
+.hcf-cal-day-selected {
+  outline: 2px solid #0073aa;
+}
+
+/* Legend */
+.hcf-cal-legend {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.hcf-leg-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin: 0 4px 0 12px;
+  border: 1px solid #ccc;
+  vertical-align: middle;
+}
+
+.hcf-leg-available { background: #e3f6d9; }
+.hcf-leg-soldout   { background: #fbd7d0; }
+.hcf-leg-closed    { background: #f3f3f3; }
+
+/* If you want to hide the underlying native date input: */
+.hcf-date-group {
+  display: none;
+}
+
+/* Base dropdown appearance */
+#hcf-timeslot {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+/* Each option */
+#hcf-timeslot option {
+    padding: 10px;
+}
+
+/* Available time slot */
+.hcf-slot-available {
+    background: #d7f4c6 !important;  /* light green */
+    color: #000;
+}
+
+/* Unavailable time slot */
+.hcf-slot-unavailable {
+    background: #f5c1c1 !important; /* light red */
+    color: #333;
+}
+
+/* Selected slot */
+#hcf-timeslot option:checked {
+    border: 2px solid #000 !important;
+}
+
+/* Hover effect for dropdown (browsers vary in support) */
+#hcf-timeslot option:hover {
+    background: #b6e89d !important;
+}
+/* Green when available */
+.hcf-slot-available {
+    background: #dff6d0 !important;
+    color: #222;
+}
+
+/* Red when unavailable */
+.hcf-slot-unavailable {
+    background: #ffd6d6 !important;
+    color: #666;
+}
+
+/* Slight hover */
+#hcf-timeslot option:hover {
+    filter: brightness(0.95);
+}
