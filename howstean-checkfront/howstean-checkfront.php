@@ -5,8 +5,9 @@
  * Version: 1.7.0
  * Author: How Stean Gorge
  */
- 
-wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' ); // Inside a plugin
+
+wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' );
+// Inside a plugin
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -277,6 +278,9 @@ class Howstean_Checkfront_Plugin {
         if ( is_wp_error( $rated ) ) {
             return $rated;
         }
+        if ( ! empty( $item['item']['param'] ) && isset( $rated['item'] ) && empty( $rated['item']['param'] ) ) {
+            $rated['item']['param'] = $item['item']['param'];
+        }
         return rest_ensure_response( $rated );
     }
 
@@ -325,37 +329,17 @@ class Howstean_Checkfront_Plugin {
             );
         }
 
-        // 2) Prepare form fields for booking/create.
-        $allowed_fields = [
-            'customer_first_name',
-            'customer_last_name',
-            'customer_email',
-            'customer_phone',
-            'company_name',
-            'customer_address',
-            'customer_city',
-            'customer_country',
-            'customer_region',
-            'customer_postal_zip',
-            'how_did_you_hear_about_us',
-            'other_please_specify',
-            'search_engine_google_yahoo_etc',
-            'guest_type',
-            'customer_email_optin',
-            'tc',
-            'customer_tos_agree',
-        ];
-
+        // 2) Prepare form fields for booking/create using the dynamic fields returned by Checkfront.
         $form_fields = [];
-        foreach ( $allowed_fields as $key ) {
-            if ( isset( $form[ $key ] ) && $form[ $key ] !== '' ) {
-                $value = $form[ $key ];
-                if ( $key === 'customer_email' ) {
-                    $value = sanitize_email( $value );
-                } else {
-                    $value = sanitize_text_field( $value );
-                }
-                $form_fields[ $key ] = $value;
+        foreach ( $form as $key => $value ) {
+            if ( '' === $value || null === $value ) {
+                continue;
+            }
+
+            if ( 'customer_email' === $key ) {
+                $form_fields[ $key ] = sanitize_email( $value );
+            } else {
+                $form_fields[ $key ] = is_scalar( $value ) ? sanitize_text_field( $value ) : '';
             }
         }
 
@@ -365,12 +349,8 @@ class Howstean_Checkfront_Plugin {
             'customer_tos_agree' => $tos_flag,
             'form'              => $form_fields,
         ];
-        
-error_log("CHECKFRONT CREATE BODY: " . print_r($create_body, true));
 
         $create_response = $api->post( 'booking/create', $create_body );
-        
-        error_log("CHECKFRONT CREATE RESPONSE: " . print_r($create_response, true));
 
         if ( is_wp_error( $create_response ) ) {
             return $create_response;
