@@ -2,7 +2,7 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.8.0
+ * Version: 1.8.2
  * Author: How Stean Gorge
  */
 
@@ -177,7 +177,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.8.0',
+            '1.8.2',
             true
         );
 
@@ -291,6 +291,43 @@ class Howstean_Checkfront_Plugin {
         }
         if ( ! empty( $item['item']['param'] ) && isset( $rated['item'] ) && empty( $rated['item']['param'] ) ) {
             $rated['item']['param'] = $item['item']['param'];
+        }
+
+        // Try to pull the booking form definition so the frontend can render fields exactly as Checkfront.
+        $form_params = [
+            'item_id'    => $item_id,
+            'start_date' => $cf_date,
+            'end_date'   => $cf_end_date,
+        ];
+        $form_response = $api->get( 'booking/form', $form_params );
+
+        if ( ! is_wp_error( $form_response ) && isset( $form_response['form'] ) ) {
+            $fields = [];
+            $form_fields = $form_response['form'];
+
+            // Normalize arrays to keyed objects by field id so JS can iterate consistently.
+            if ( is_array( $form_fields ) ) {
+                foreach ( $form_fields as $field ) {
+                    if ( isset( $field['id'] ) ) {
+                        $fields[ $field['id'] ] = $field;
+                    }
+                }
+            } elseif ( is_array( $form_response['booking']['form'] ?? null ) ) {
+                foreach ( $form_response['booking']['form'] as $field ) {
+                    if ( isset( $field['id'] ) ) {
+                        $fields[ $field['id'] ] = $field;
+                    }
+                }
+            }
+
+            if ( ! empty( $fields ) ) {
+                if ( empty( $rated['item']['param'] ) || ! is_array( $rated['item']['param'] ) ) {
+                    $rated['item']['param'] = $fields;
+                } else {
+                    $rated['item']['param'] = array_merge( $rated['item']['param'], $fields );
+                }
+                $rated['item']['_booking_form'] = $fields;
+            }
         }
         return rest_ensure_response( $rated );
     }
