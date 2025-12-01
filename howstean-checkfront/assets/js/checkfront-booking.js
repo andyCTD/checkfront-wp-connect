@@ -48,6 +48,7 @@
     var timeslotGroup, timeslotSelect;
     var checkBtn, bookBtn;
     var calendarContainer, calMonthLabel, calBody;
+    var dynamicFieldsContainer, optionsSection;
 
     var wrapper = createEl('div', { class: 'howstean-checkfront-wrapper' });
 
@@ -132,7 +133,7 @@
     endDateInput.value = endVal;
     endDateInput.min = endVal;
 
-    // Helper: load rated availability for current date & quantity
+    // Helper: load rated availability for current date range & quantity
     function loadAvailability() {
       if (!dateInput.value) {
         alert('Please choose a check-in date.');
@@ -240,13 +241,134 @@
     availabilityBox = createEl('div', { class: 'hcf-availability' });
     wrapper.appendChild(availabilityBox);
 
-    // ===== Booking form (populated dynamically from Checkfront) =====
+    // ===== Booking form (dynamic options + customer details) =====
     bookingForm = createEl('div', { class: 'hcf-booking-form' });
     bookingForm.style.display = 'none';
+
+    // Options pulled from Checkfront item parameters
+    optionsSection = createEl('div', { class: 'hcf-section-options' });
+    optionsSection.appendChild(createEl('h3', null, ['Booking Options']));
+    dynamicFieldsContainer = createEl('div', { class: 'hcf-dynamic-fields' });
+    optionsSection.appendChild(dynamicFieldsContainer);
+    bookingForm.appendChild(optionsSection);
+
+    // Customer details (static booking form fields)
     bookingForm.appendChild(createEl('h3', null, ['Your Details']));
 
-    var dynamicFieldsContainer = createEl('div', { class: 'hcf-dynamic-fields' });
-    bookingForm.appendChild(dynamicFieldsContainer);
+    var cols = createEl('div', { class: 'hcf-two-cols' });
+    var colLeft = createEl('div', { class: 'hcf-col hcf-col-left' });
+    var colRight = createEl('div', { class: 'hcf-col hcf-col-right' });
+
+    function field(labelText, id, type) {
+      var g = createEl('div', { class: 'hcf-field-group' });
+      g.appendChild(createEl('label', { for: id }, [labelText]));
+      g.appendChild(createEl('input', { type: type || 'text', id: id }));
+      return g;
+    }
+
+    colLeft.appendChild(field('First Name *', 'hcf-first-name', 'text'));
+    colLeft.appendChild(field('Surname *', 'hcf-last-name', 'text'));
+    colLeft.appendChild(field('E-mail *', 'hcf-email', 'email'));
+    colLeft.appendChild(field('Phone *', 'hcf-phone', 'tel'));
+    colLeft.appendChild(field('Company Name', 'hcf-company', 'text'));
+    colLeft.appendChild(field('First Line Billing Address *', 'hcf-address', 'text'));
+    colLeft.appendChild(field('Town/City *', 'hcf-city', 'text'));
+    colLeft.appendChild(field('Postal / Zip *', 'hcf-postal', 'text'));
+
+    var countryGroup = createEl('div', { class: 'hcf-field-group' });
+    countryGroup.appendChild(createEl('label', { for: 'hcf-country-display' }, ['Country *']));
+    var countryDisplay = createEl('input', {
+      type: 'text',
+      id: 'hcf-country-display',
+      value: 'United Kingdom',
+      disabled: 'disabled'
+    });
+    var countryHidden = createEl('input', {
+      type: 'hidden',
+      id: 'hcf-country',
+      value: 'GB'
+    });
+    countryGroup.appendChild(countryDisplay);
+    countryGroup.appendChild(countryHidden);
+    colRight.appendChild(countryGroup);
+
+    var countyGroup = createEl('div', { class: 'hcf-field-group' });
+    countyGroup.appendChild(createEl('label', { for: 'hcf-county' }, ['County *']));
+    var countySelect = createEl('select', { id: 'hcf-county' });
+    countySelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
+    function addCounty(value, label) {
+      countySelect.appendChild(createEl('option', { value: value }, [label]));
+    }
+    addCounty('NYK', 'North Yorkshire, England');
+    addCounty('WYK', 'West Yorkshire, England');
+    addCounty('LND', 'London, England');
+    addCounty('LAN', 'Lancashire, England');
+    addCounty('CMA', 'Cumbria, England');
+    addCounty('DBY', 'Derbyshire, England');
+    addCounty('NFK', 'Norfolk, England');
+    addCounty('NTH', 'Northamptonshire, England');
+    addCounty('NTT', 'Nottinghamshire, England');
+    addCounty('OXF', 'Oxfordshire, England');
+    countyGroup.appendChild(countySelect);
+    colRight.appendChild(countyGroup);
+
+    var hearGroup = createEl('div', { class: 'hcf-field-group' });
+    hearGroup.appendChild(createEl('label', { for: 'hcf-hear' }, ['How Did You Hear About Us? *']));
+    var hearSelect = createEl('select', { id: 'hcf-hear' });
+    hearSelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
+    hearSelect.appendChild(createEl('option', { value: 'search_engine' }, ['Search Engine']));
+    hearSelect.appendChild(createEl('option', { value: 'social_media' }, ['Social Media']));
+    hearSelect.appendChild(createEl('option', { value: 'friend_family' }, ['Friend / Family']));
+    hearSelect.appendChild(createEl('option', { value: 'other' }, ['Other']));
+    hearGroup.appendChild(hearSelect);
+    colRight.appendChild(hearGroup);
+
+    var otherGroup = createEl('div', { class: 'hcf-field-group' });
+    otherGroup.appendChild(createEl('label', { for: 'hcf-other' }, ['Other (please specify)']));
+    var otherInput = createEl('input', { type: 'text', id: 'hcf-other' });
+    otherGroup.appendChild(otherInput);
+    colRight.appendChild(otherGroup);
+
+    var searchGroup = createEl('div', { class: 'hcf-field-group' });
+    searchGroup.appendChild(createEl('label', { for: 'hcf-search' }, ['Search Engine (can you remember your search term?)']));
+    var searchInput = createEl('input', { type: 'text', id: 'hcf-search' });
+    searchGroup.appendChild(searchInput);
+    colRight.appendChild(searchGroup);
+
+    var guestGroup = createEl('div', { class: 'hcf-field-group' });
+    guestGroup.appendChild(createEl('label', { for: 'hcf-guest-type' }, ['Guest Type *']));
+    var guestSelect = createEl('select', { id: 'hcf-guest-type' });
+    guestSelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
+    guestSelect.appendChild(createEl('option', { value: 'leisure' }, ['Leisure']));
+    guestSelect.appendChild(createEl('option', { value: 'corporate' }, ['Corporate']));
+    guestSelect.appendChild(createEl('option', { value: 'education' }, ['Education / School']));
+    guestSelect.appendChild(createEl('option', { value: 'team' }, ['Team Building']));
+    guestSelect.appendChild(createEl('option', { value: 'hen_stag' }, ['Hen / Stag']));
+    guestSelect.appendChild(createEl('option', { value: 'other' }, ['Other']));
+    guestGroup.appendChild(guestSelect);
+    colRight.appendChild(guestGroup);
+
+    var newsletterGroup = createEl('div', { class: 'hcf-field-group' });
+    var newsletterLabel = createEl('label', null, []);
+    var newsletterCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-newsletter' });
+    newsletterLabel.appendChild(newsletterCheckbox);
+    newsletterLabel.appendChild(document.createTextNode(' Add me to the How Stean Newsletter list'));
+    newsletterGroup.appendChild(newsletterLabel);
+    colRight.appendChild(newsletterGroup);
+
+    cols.appendChild(colLeft);
+    cols.appendChild(colRight);
+    bookingForm.appendChild(cols);
+
+    var tosGroup = createEl('div', { class: 'hcf-field-group hcf-tos' });
+    var tosCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-tos' });
+    var tosLabel = createEl('label', { for: 'hcf-tos' }, [
+      ' I agree to the ',
+      createEl('a', { href: 'https://howstean.co.uk/terms-and-conditions/', target: '_blank', rel: 'noopener noreferrer' }, ['Terms and Conditions'])
+    ]);
+    tosGroup.appendChild(tosCheckbox);
+    tosGroup.appendChild(tosLabel);
+    bookingForm.appendChild(tosGroup);
 
     // Book button (enabled after we have a slip + form fields)
     bookBtn = createEl('button', { type: 'button', class: 'hcf-book-btn', disabled: 'disabled' }, ['Complete Booking & Pay']);
@@ -322,6 +444,30 @@
       }
 
       return opts;
+    }
+
+    function collectParams(item) {
+      if (!item || typeof item !== 'object') return {};
+      var params = item.param || item.parameters || item.options || item._booking_form || null;
+      if (!params && item.form && typeof item.form === 'object') {
+        params = item.form;
+      }
+      if (!params && item.booking && item.booking.form) {
+        params = item.booking.form;
+      }
+      // Some APIs return an array of fields; convert to keyed object
+      if (Array.isArray(params)) {
+        var obj = {};
+        params.forEach(function (f, idx) {
+          if (f && f.id) {
+            obj[f.id] = f;
+          } else {
+            obj['field_' + idx] = f;
+          }
+        });
+        params = obj;
+      }
+      return params || {};
     }
 
     function buildFieldControl(name, field) {
@@ -668,7 +814,7 @@ if (titleNode && state.itemName) {
 // store item name
 state.itemName = item.name || "";
 
-      renderDynamicFields(item.param || {});
+      renderDynamicFields(collectParams(item));
 
 
       if (item.rules && typeof item.rules === 'string') {
@@ -693,10 +839,13 @@ state.itemName = item.name || "";
         return;
       }
 
-
-      // Save rated data and base slip
+      // Save rated data and base slip (handle string or array slips)
       state.rated = item;
-      state.baseSlip = rate.slip || null;
+      if (Array.isArray(rate.slip) && rate.slip.length) {
+        state.baseSlip = rate.slip[0];
+      } else {
+        state.baseSlip = rate.slip || null;
+      }
       state.slip = state.baseSlip || null;
       bookBtn.disabled = !state.slip;
 
@@ -836,7 +985,7 @@ state.itemName = item.name || "";
 
       }
 
-      bookingForm.style.display = state.slip ? 'block' : 'none';
+      bookingForm.style.display = 'block';
 
       debugBox.style.display = 'block';
       debugBox.textContent = 'Rated response from Checkfront:\n\n' + JSON.stringify(data, null, 2);
@@ -985,12 +1134,58 @@ state.itemName = item.name || "";
         formPayload[name] = value;
       });
 
+      // Static fields
+      var staticMissing = [];
+      var staticFields = [
+        { key: 'customer_first_name', id: 'hcf-first-name', label: 'First Name' },
+        { key: 'customer_last_name', id: 'hcf-last-name', label: 'Surname' },
+        { key: 'customer_email', id: 'hcf-email', label: 'E-mail' },
+        { key: 'customer_phone', id: 'hcf-phone', label: 'Phone' },
+        { key: 'company_name', id: 'hcf-company', label: 'Company Name', required: false },
+        { key: 'customer_address', id: 'hcf-address', label: 'First Line Billing Address' },
+        { key: 'customer_city', id: 'hcf-city', label: 'Town/City' },
+        { key: 'customer_postal_zip', id: 'hcf-postal', label: 'Postal / Zip' },
+        { key: 'customer_country', id: 'hcf-country', label: 'Country' },
+        { key: 'customer_region', id: 'hcf-county', label: 'County' },
+        { key: 'hear_about_us', id: 'hcf-hear', label: 'How Did You Hear About Us?' },
+        { key: 'hear_about_other', id: 'hcf-other', label: 'Other (please specify)', required: false },
+        { key: 'search_engine_term', id: 'hcf-search', label: 'Search Engine', required: false },
+        { key: 'guest_type', id: 'hcf-guest-type', label: 'Guest Type' },
+        { key: 'newsletter_optin', id: 'hcf-newsletter', label: 'Newsletter', type: 'checkbox', required: false },
+      ];
+
+      staticFields.forEach(function(fieldDef) {
+        var el = document.getElementById(fieldDef.id);
+        if (!el) return;
+        var value = '';
+        if ((fieldDef.type || el.type) === 'checkbox') {
+          value = el.checked ? (el.value || '1') : '';
+        } else {
+          value = (el.value || '').trim();
+        }
+        if ((fieldDef.required !== false) && !value) {
+          staticMissing.push(fieldDef.label || fieldDef.key);
+        }
+        formPayload[fieldDef.key] = value;
+      });
+
+      // Terms of Service check
+      var tosChecked = document.getElementById('hcf-tos');
+      if (!tosChecked || !tosChecked.checked) {
+        staticMissing.push('Terms of Service agreement');
+      }
+
+      if (staticMissing.length) {
+        alert('Please fill in all required fields: ' + staticMissing.join(', '));
+        return;
+      }
+
       if (missing.length) {
         alert('Please fill in all required fields: ' + missing.join(', '));
         return;
       }
 
-      var tosAgreed = formPayload.customer_tos_agree === '1' || formPayload.customer_tos_agree === 1 || formPayload.customer_tos_agree === true;
+      var tosAgreed = tosChecked && tosChecked.checked;
 
       var payload = {
         policy: { customer_tos_agree: tosAgreed ? 1 : 0 },
