@@ -44,7 +44,7 @@
     // We render month views starting from the 1st of the month
     var currentCalDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    var dateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
+    var dateInput, endDateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
     var timeslotGroup, timeslotSelect;
     var checkBtn, bookBtn;
     var calendarContainer, calMonthLabel, calBody;
@@ -109,23 +109,42 @@
     var dateGroup = createEl('div', {
       class: 'hcf-field-group hcf-field-inline hcf-date-group'
     });
-    dateGroup.appendChild(createEl('label', null, ['Selected Date']));
+    dateGroup.appendChild(createEl('label', null, ['Check-in']));
     dateInput = createEl('input', { type: 'date', id: 'hcf-date' });
+
+    var endGroup = createEl('div', {
+      class: 'hcf-field-group hcf-field-inline hcf-date-group'
+    });
+    endGroup.appendChild(createEl('label', null, ['Check-out']));
+    endDateInput = createEl('input', { type: 'date', id: 'hcf-end-date' });
 
     var yyyy = today.getFullYear();
     var mm = ('0' + (today.getMonth() + 1)).slice(-2);
     var dd = ('0' + today.getDate()).slice(-2);
-    dateInput.value = yyyy + '-' + mm + '-' + dd;
-    dateInput.min = dateInput.value;
+    var startVal = yyyy + '-' + mm + '-' + dd;
+    var tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    var tmm = ('0' + (tomorrow.getMonth() + 1)).slice(-2);
+    var tdd = ('0' + tomorrow.getDate()).slice(-2);
+    var endVal = tomorrow.getFullYear() + '-' + tmm + '-' + tdd;
+
+    dateInput.value = startVal;
+    dateInput.min = startVal;
+    endDateInput.value = endVal;
+    endDateInput.min = endVal;
 
     // Helper: load rated availability for current date & quantity
     function loadAvailability() {
       if (!dateInput.value) {
-        alert('Please choose a date.');
+        alert('Please choose a check-in date.');
+        return;
+      }
+      if (!endDateInput.value) {
+        alert('Please choose a check-out date.');
         return;
       }
 
       var dateYmd = dateInput.value.replace(/-/g, '');
+      var endYmd = endDateInput.value ? endDateInput.value.replace(/-/g, '') : dateYmd;
       var qty = state.qty;
 
       setLoading(true);
@@ -133,6 +152,7 @@
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(dateYmd) +
+        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=' + encodeURIComponent(qty);
 
       fetch(url, {
@@ -159,12 +179,38 @@
     // AUTO-REFRESH availability + timeslots when date changes
     dateInput.addEventListener('change', function () {
       if (!dateInput.value) return;
+      var start = new Date(dateInput.value);
+      if (!isNaN(start.getTime())) {
+        var nextDay = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+        var mm2 = ('0' + (nextDay.getMonth() + 1)).slice(-2);
+        var dd2 = ('0' + nextDay.getDate()).slice(-2);
+        var minEnd = nextDay.getFullYear() + '-' + mm2 + '-' + dd2;
+        if (!endDateInput.value || endDateInput.value < minEnd) {
+          endDateInput.value = minEnd;
+        }
+        endDateInput.min = minEnd;
+      }
+      loadAvailability();
+    });
+
+    endDateInput.addEventListener('change', function () {
+      if (!endDateInput.value || !dateInput.value) return;
+      if (endDateInput.value <= dateInput.value) {
+        var start = new Date(dateInput.value);
+        var nextDay = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+        var mm2 = ('0' + (nextDay.getMonth() + 1)).slice(-2);
+        var dd2 = ('0' + nextDay.getDate()).slice(-2);
+        endDateInput.value = nextDay.getFullYear() + '-' + mm2 + '-' + dd2;
+      }
       loadAvailability();
     });
 
 
-    dateGroup.appendChild(dateInput);
+      dateGroup.appendChild(dateInput);
+    endGroup.appendChild(endDateInput);
+
     wrapper.appendChild(dateGroup);
+    wrapper.appendChild(endGroup);
 
     // ===== Quantity selector =====
     var qtyGroup = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
@@ -252,39 +298,149 @@
       checkBtn.textContent = isLoading ? 'Checking…' : 'Check Availability & Price';
     }
 
-    function buildFieldControl(name, field) {
-      var type = (field.type || 'text').toLowerCase();
-      var id = 'hcf-field-' + name;
-      var input;
+    function normalizeOptions(field) {
+      var raw = field.options || field.choices || field.values || [];
+      var opts = [];
 
-      if (type === 'select' && field.options) {
-        input = createEl('select', { id: id, 'data-field-name': name });
-        input.appendChild(createEl('option', { value: '' }, ['Please Select']));
-        var opts = field.options;
-        if (Array.isArray(opts)) {
-          opts.forEach(function (opt) {
-            var v = typeof opt === 'object' ? opt.value : opt;
-            var lbl = typeof opt === 'object' ? (opt.label || opt.name || opt.value) : opt;
-            input.appendChild(createEl('option', { value: v }, [lbl]));
-          });
-        } else if (typeof opts === 'object') {
-          Object.keys(opts).forEach(function (k) {
-            input.appendChild(createEl('option', { value: k }, [opts[k]]));
-          });
+      if (Array.isArray(raw)) {
+        raw.forEach(function(opt) {
+          if (opt && typeof opt === 'object') {
+            opts.push({ value: opt.value || opt.id || opt.name, label: opt.label || opt.name || opt.value });
+          } else {
+            opts.push({ value: opt, label: opt });
+          }
+        });
+      } else if (typeof raw === 'object' && raw !== null) {
+        Object.keys(raw).forEach(function(key) {
+          var val = raw[key];
+          if (val && typeof val === 'object') {
+            opts.push({ value: val.value || key, label: val.label || val.name || val.value || key });
+          } else {
+            opts.push({ value: key, label: val });
+          }
+        });
+      }
+
+      return opts;
+    }
+
+    function buildFieldControl(name, field) {
+      var type = (field.type || field.input || 'text').toLowerCase();
+      var display = (field.display || field.widget || '').toLowerCase();
+      var htmlType = type;
+      if (type === 'spin' || type === 'number') htmlType = 'number';
+      if (type === 'phone') htmlType = 'tel';
+      if (type === 'checkbox') htmlType = 'checkbox';
+      var id = 'hcf-field-' + name;
+      var control;
+
+      var options = normalizeOptions(field);
+      var wantsRadio = type === 'radio' || display === 'radio';
+      var isMultiCheckbox = (type === 'checkbox' && options.length > 1) || display === 'checkboxes';
+
+      if ((type === 'select' || type === 'option' || display === 'select') && options.length) {
+        control = createEl('select', { id: id, 'data-field-name': name });
+        if (!field.required) {
+          control.appendChild(createEl('option', { value: '' }, ['Please Select']));
         }
+        options.forEach(function(opt) {
+          control.appendChild(createEl('option', { value: opt.value }, [opt.label]));
+        });
+      } else if (wantsRadio && options.length) {
+        control = createEl('div', { class: 'hcf-radio-group', id: id });
+        options.forEach(function(opt, idx) {
+          var inputId = id + '-opt-' + idx;
+          var input = createEl('input', {
+            type: 'radio',
+            id: inputId,
+            name: id,
+            'data-field-name': name,
+            value: opt.value
+          });
+          control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
+        });
+      } else if (isMultiCheckbox && options.length) {
+        control = createEl('div', { class: 'hcf-checkbox-group', id: id });
+        options.forEach(function(opt, idx) {
+          var inputId = id + '-chk-' + idx;
+          var input = createEl('input', {
+            type: 'checkbox',
+            id: inputId,
+            name: id,
+            'data-field-name': name,
+            value: opt.value
+          });
+          control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
+        });
       } else if (type === 'checkbox') {
-        input = createEl('input', { type: 'checkbox', id: id, 'data-field-name': name, value: '1' });
+        control = createEl('input', { type: htmlType, id: id, 'data-field-name': name, value: '1' });
       } else if (type === 'textarea') {
-        input = createEl('textarea', { id: id, 'data-field-name': name });
+        control = createEl('textarea', { id: id, 'data-field-name': name });
       } else {
-        input = createEl('input', { type: type, id: id, 'data-field-name': name });
+        control = createEl('input', { type: htmlType, id: id, 'data-field-name': name });
+      }
+
+      if (field.placeholder && control.tagName) {
+        control.setAttribute('placeholder', field.placeholder);
+      }
+
+      var range = field.range || field.valid_range || field.validation;
+      if (range && control.tagName && control.tagName.toLowerCase() !== 'div') {
+        if (range.start) control.setAttribute('min', range.start);
+        if (range.end) control.setAttribute('max', range.end);
+        if (range.step) control.setAttribute('step', range.step);
+      }
+
+      var defaultVal = field.default;
+      if (typeof defaultVal === 'undefined') defaultVal = field.value;
+      var defaultArray = Array.isArray(defaultVal) ? defaultVal : [defaultVal];
+
+      if (control && control.tagName === 'SELECT' && typeof defaultVal !== 'undefined') {
+        Array.prototype.forEach.call(control.options, function(opt) {
+          if (defaultArray.indexOf(opt.value) !== -1) {
+            opt.selected = true;
+          }
+        });
+      } else if (control && control.classList.contains('hcf-radio-group')) {
+        var radios = control.querySelectorAll('input[type="radio"]');
+        Array.prototype.forEach.call(radios, function(input) {
+          if (defaultArray.indexOf(input.value) !== -1) {
+            input.checked = true;
+          }
+        });
+      } else if (control && control.classList.contains('hcf-checkbox-group')) {
+        var checkboxes = control.querySelectorAll('input[type="checkbox"]');
+        Array.prototype.forEach.call(checkboxes, function(input) {
+          if (defaultArray.indexOf(input.value) !== -1) {
+            input.checked = true;
+          }
+        });
+      } else if (control && control.tagName === 'TEXTAREA') {
+        if (typeof defaultVal !== 'undefined') control.value = defaultVal;
+      } else if (control && control.tagName === 'INPUT') {
+        if (htmlType === 'checkbox') {
+          if (defaultVal === true || defaultVal === '1' || defaultVal === 1) {
+            control.checked = true;
+          }
+        } else if (typeof defaultVal !== 'undefined') {
+          control.value = defaultVal;
+        }
       }
 
       if (field.required) {
-        input.setAttribute('required', 'required');
+        if (control.tagName && control.tagName.toLowerCase() === 'div') {
+          control.setAttribute('data-field-required', '1');
+          var groupedInputs = control.querySelectorAll('input');
+          Array.prototype.forEach.call(groupedInputs, function(input) {
+            input.setAttribute('data-field-required', '1');
+            input.required = true;
+          });
+        } else {
+          control.setAttribute('required', 'required');
+        }
       }
 
-      return input;
+      return control;
     }
 
     function renderDynamicFields(params) {
@@ -295,7 +451,16 @@
         return;
       }
 
-      Object.keys(params).forEach(function (name) {
+      var names = Object.keys(params);
+      names.sort(function(a, b) {
+        var fa = params[a] || {};
+        var fb = params[b] || {};
+        var oa = parseInt(fa.order || fa.weight || fa.position || fa.sort || 0, 10);
+        var ob = parseInt(fb.order || fb.weight || fb.position || fb.sort || 0, 10);
+        return oa - ob;
+      });
+
+      names.forEach(function (name) {
         var field = params[name] || {};
         var group = createEl('div', { class: 'hcf-field-group' });
 
@@ -326,9 +491,23 @@
 
     // Load availability for a single day and colour the calendar cell
     function loadDayStatus(ymd, cell) {
+      var endYmd = ymd;
+      if (endDateInput && endDateInput.value) {
+        endYmd = endDateInput.value.replace(/-/g, '');
+        if (parseInt(endYmd, 10) <= parseInt(ymd, 10)) {
+          // enforce a minimum one-night stay when previewing cells
+          var y = parseInt(ymd.slice(0, 4), 10);
+          var m = parseInt(ymd.slice(4, 6), 10) - 1;
+          var d = parseInt(ymd.slice(6, 8), 10);
+          var nextDay = new Date(y, m, d + 1);
+          endYmd = ymdFromDate(nextDay);
+        }
+      }
+
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(ymd) +
+        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=1';
 
       fetch(url, {
@@ -610,12 +789,25 @@ state.itemName = item.name || "";
     }
 
         if (s.date)  ul.appendChild(createEl('li', null, ['Date: ' + s.date]));
+        if (s.end_date && s.end_date !== s.date) {
+          ul.appendChild(createEl('li', null, ['Check-out: ' + s.end_date]));
+          var startDateObj = new Date(s.date.replace(/-/g, '/'));
+          var endDateObj = new Date(s.end_date.replace(/-/g, '/'));
+          if (!isNaN(startDateObj) && !isNaN(endDateObj)) {
+            var nights = Math.round((endDateObj - startDateObj) / (1000 * 60 * 60 * 24));
+            if (nights > 0) {
+              ul.appendChild(createEl('li', null, ['Nights: ' + nights]));
+            }
+          }
+        }
 
         // Show currently selected time slot (if any)
         if (state.timeslots && state.timeslots.length) {
-          var selIndex = typeof state.selectedTimeslotIndex === 'number'
-                         ? state.selectedTimeslotIndex
-                         : 0;
+          var selIndex = (typeof state.selectedTimeslotIndex === 'number' &&
+                          state.selectedTimeslotIndex >= 0 &&
+                          state.selectedTimeslotIndex < state.timeslots.length)
+                        ? state.selectedTimeslotIndex
+                        : 0;
           var tsSel = state.timeslots[selIndex];
           if (tsSel) {
             var start = tsSel.start_time || '';
@@ -683,10 +875,15 @@ state.itemName = item.name || "";
     // === "Check Availability & Price" click ===
     checkBtn.addEventListener('click', function() {
       if (!dateInput.value) {
-        alert('Please choose a date.');
+        alert('Please choose a check-in date.');
+        return;
+      }
+      if (!endDateInput.value) {
+        alert('Please choose a check-out date.');
         return;
       }
       var dateYmd = dateInput.value.replace(/-/g, '');
+      var endYmd = endDateInput.value.replace(/-/g, '');
       var qty = state.qty;
 
       setLoading(true);
@@ -694,6 +891,7 @@ state.itemName = item.name || "";
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(dateYmd) +
+        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=' + encodeURIComponent(qty);
 
       fetch(url, {
@@ -724,24 +922,63 @@ state.itemName = item.name || "";
         return;
       }
       var formFields = dynamicFieldsContainer ? dynamicFieldsContainer.querySelectorAll('[data-field-name]') : [];
+      var grouped = {};
+
+      Array.prototype.forEach.call(formFields, function(el) {
+        var name = el.getAttribute('data-field-name');
+        if (!grouped[name]) grouped[name] = [];
+        grouped[name].push(el);
+      });
+
       var formPayload = {};
       var missing = [];
 
-      Array.prototype.forEach.call(formFields, function (el) {
-        var name = el.getAttribute('data-field-name');
-        var value = '';
-        var tag = el.tagName.toLowerCase();
-        var type = (el.getAttribute('type') || '').toLowerCase();
+      Object.keys(grouped).forEach(function(name) {
+        var inputs = grouped[name];
+        if (!inputs.length) return;
 
-        if (type === 'checkbox') {
-          value = el.checked ? (el.value || '1') : '';
+        var first = inputs[0];
+        var tag = first.tagName.toLowerCase();
+        var type = (first.getAttribute('type') || '').toLowerCase();
+        var required = first.required || first.getAttribute('data-field-required') === '1';
+
+        var value = '';
+
+        if (inputs.length > 1) {
+          // Radio or checkbox groups
+          if (type === 'radio') {
+            inputs.forEach(function(el) {
+              if (el.checked) value = el.value;
+            });
+          } else {
+            var selected = [];
+            inputs.forEach(function(el) {
+              var elType = (el.getAttribute('type') || '').toLowerCase();
+              if (elType === 'checkbox' && el.checked) {
+                selected.push(el.value || '1');
+              }
+            });
+            value = selected.length > 1 ? selected : (selected[0] || '');
+          }
         } else if (tag === 'select') {
-          value = el.value;
+          if (first.multiple) {
+            var chosen = [];
+            Array.prototype.forEach.call(first.options, function(opt) {
+              if (opt.selected && opt.value) {
+                chosen.push(opt.value);
+              }
+            });
+            value = chosen.length > 1 ? chosen : (chosen[0] || '');
+          } else {
+            value = first.value;
+          }
+        } else if (type === 'checkbox') {
+          value = first.checked ? (first.value || '1') : '';
         } else {
-          value = (el.value || '').trim();
+          value = (first.value || '').trim();
         }
 
-        if (el.required && !value) {
+        if (required && (!value || (Array.isArray(value) && value.length === 0))) {
           missing.push(name);
         }
 
