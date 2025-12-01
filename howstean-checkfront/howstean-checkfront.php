@@ -2,7 +2,7 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: How Stean Gorge
  */
 
@@ -177,7 +177,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.7.0',
+            '1.8.0',
             true
         );
 
@@ -229,6 +229,7 @@ class Howstean_Checkfront_Plugin {
     public function rest_get_item_rated( WP_REST_Request $request ) {
         $item_id = intval( $request->get_param( 'item_id' ) );
         $date    = $request->get_param( 'date' );
+        $end     = $request->get_param( 'end_date' );
         $qty     = intval( $request->get_param( 'qty' ) );
 
         if ( ! $item_id ) {
@@ -266,11 +267,21 @@ class Howstean_Checkfront_Plugin {
         if ( ! $timestamp ) {
             return new WP_Error( 'bad_date', 'Invalid date format.', [ 'status' => 400 ] );
         }
-        $cf_date = date( 'Ymd', $timestamp );
+
+        $end_timestamp = $end ? strtotime( $end ) : $timestamp;
+        if ( ! $end_timestamp ) {
+            return new WP_Error( 'bad_end_date', 'Invalid end_date format.', [ 'status' => 400 ] );
+        }
+        if ( $end_timestamp <= $timestamp ) {
+            $end_timestamp = strtotime( '+1 day', $timestamp );
+        }
+
+        $cf_date     = date( 'Ymd', $timestamp );
+        $cf_end_date = date( 'Ymd', $end_timestamp );
 
         $params = [
             'start_date'                 => $cf_date,
-            'end_date'                   => $cf_date,
+            'end_date'                   => $cf_end_date,
             'param[' . $param_name . ']' => $qty,
         ];
 
