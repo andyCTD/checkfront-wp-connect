@@ -449,6 +449,15 @@
       return opts;
     }
 
+    function isNumericConfig(field) {
+      if (!field || typeof field !== 'object') return false;
+      if (typeof field.MIN !== 'undefined' || typeof field.MAX !== 'undefined') return true;
+      if (typeof field.def !== 'undefined' && !isNaN(field.def)) return true;
+      if (typeof field.qty !== 'undefined' && !isNaN(field.qty)) return true;
+      if (field.range && (field.range.start || field.range.end)) return true;
+      return false;
+    }
+
     function collectParams(item) {
       if (!item || typeof item !== 'object') return {};
       var params = item.param || item.parameters || item.options || item._booking_form || null;
@@ -473,13 +482,13 @@
       return params || {};
     }
 
-    function buildFieldControl(name, field) {
+    function buildFieldControl(name, field, priceSuffix) {
       var typeKey = (field.type || field.input || field.html_type || field.widget || field.display || 'text').toLowerCase();
       var display = (field.display || field.widget || '').toLowerCase();
 
       // Normalise common Checkfront field types to browser input types
       var htmlType = typeKey;
-      if (['spin', 'spinner', 'integer', 'int', 'float', 'decimal', 'number'].indexOf(typeKey) !== -1) htmlType = 'number';
+      if (['spin', 'spinner', 'integer', 'int', 'float', 'decimal', 'number'].indexOf(typeKey) !== -1 || isNumericConfig(field)) htmlType = 'number';
       if (['phone', 'tel'].indexOf(typeKey) !== -1) htmlType = 'tel';
       if (typeKey === 'email') htmlType = 'email';
       if (typeKey === 'checkbox') htmlType = 'checkbox';
@@ -542,8 +551,9 @@
         var wrap = createEl('div', { class: 'hcf-input-wrap' }, [prefix, control]);
         control = wrap;
       }
-      if (field.suffix) {
-        var suffix = createEl('span', { class: 'hcf-input-suffix' }, [field.suffix]);
+      if (field.suffix || priceSuffix) {
+        var suffixText = field.suffix || priceSuffix;
+        var suffix = createEl('span', { class: 'hcf-input-suffix' }, [suffixText]);
         if (control.classList && control.classList.contains('hcf-input-wrap')) {
           control.appendChild(suffix);
         } else {
@@ -637,7 +647,7 @@
       return control;
     }
 
-    function renderDynamicFields(params) {
+    function renderDynamicFields(params, priceMap) {
       if (!dynamicFieldsContainer) return;
       dynamicFieldsContainer.innerHTML = '';
 
@@ -659,19 +669,38 @@
 
       names.forEach(function (name) {
         var field = params[name] || {};
+        // Skip hidden/locked fields that aren’t customer-facing
+        if (field.hide === 1 || field.customer_hide === 1) {
+          return;
+        }
         var group = createEl('div', { class: 'hcf-field-group' });
 
-        var labelText = field.label || field.name || name;
+        var labelText = field.label || field.lbl || field.name || field.title || name;
         if (field.required) {
           labelText += ' *';
         }
         group.appendChild(createEl('label', { for: 'hcf-field-' + name }, [labelText]));
 
-        var control = buildFieldControl(name, field);
+        var priceSuffix = null;
+        if (priceMap && priceMap[name]) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = String(priceMap[name]);
+          priceSuffix = 'x ' + tmp.textContent.trim();
+        }
+
+        var control = buildFieldControl(name, field, priceSuffix);
         group.appendChild(control);
 
-        if (field.instructions) {
-          group.appendChild(createEl('p', { class: 'hcf-help' }, [field.instructions]));
+        var help = field.instructions || field.instruction || field.description || field.help;
+        if (help) {
+          group.appendChild(createEl('p', { class: 'hcf-help' }, [help]));
+        }
+
+        if (field.prefix || field.suffix) {
+          var addon = createEl('p', { class: 'hcf-help' }, []);
+          if (field.prefix) addon.appendChild(document.createTextNode(String(field.prefix)));
+          if (field.suffix) addon.appendChild(document.createTextNode(' ' + String(field.suffix)));
+          group.appendChild(addon);
         }
 
         dynamicFieldsContainer.appendChild(group);
@@ -726,10 +755,17 @@
           var available = (typeof rate.available !== 'undefined')
             ? parseInt(rate.available, 10)
             : null;
+          // Prefer per-day status when present (handles min-duration errors)
+          if (rate.dates && rate.dates[ymd] && rate.dates[ymd].status) {
+            status = String(rate.dates[ymd].status).toUpperCase();
+            if (rate.dates[ymd].stock && typeof rate.dates[ymd].stock.A !== 'undefined') {
+              available = parseInt(rate.dates[ymd].stock.A, 10);
+            }
+          }
 
           cell.classList.remove('hcf-cal-closed', 'hcf-cal-available', 'hcf-cal-soldout');
 
-          if (status === 'AVAILABLE' && (available === null || available > 0)) {
+          if ((status === 'AVAILABLE' || status === 'A') && (available === null || available > 0)) {
             cell.classList.add('hcf-cal-available');
           } else {
             cell.classList.add('hcf-cal-soldout');
@@ -865,7 +901,11 @@ if (titleNode && state.itemName) {
 // store item name
 state.itemName = item.name || "";
 
-      renderDynamicFields(collectParams(item));
+      var priceMap = null;
+      if (item.rate && item.rate.summary && item.rate.summary.price && item.rate.summary.price.param) {
+        priceMap = item.rate.summary.price.param;
+      }
+      renderDynamicFields(collectParams(item), priceMap);
 
 
       if (item.rules && typeof item.rules === 'string') {
