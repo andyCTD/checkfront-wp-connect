@@ -2,7 +2,7 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.8.5
+ * Version: 1.8.6
  * Author: How Stean Gorge
  */
 
@@ -176,7 +176,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.8.5',
+            '1.8.6',
             true
         );
 
@@ -446,7 +446,7 @@ class Howstean_Checkfront_API {
             return new WP_Error( 'no_config', 'Checkfront API not configured.' );
         }
 
-        $url = $this->base_url . ltrim( $path, '/' );
+        $url = $this->base_url + ltrim( $path, '/' );
         if ( ! empty( $query ) ) {
             $url = add_query_arg( $query, $url );
         }
