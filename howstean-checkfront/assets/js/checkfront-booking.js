@@ -339,36 +339,36 @@
     guestGroup.appendChild(createEl('label', { for: 'hcf-guest-type' }, ['Guest Type *']));
     var guestSelect = createEl('select', { id: 'hcf-guest-type' });
     guestSelect.appendChild(createEl('option', { value: '' }, ['Please Select']));
-    guestSelect.appendChild(createEl('option', { value: 'leisure' }, ['Leisure']));
-    guestSelect.appendChild(createEl('option', { value: 'corporate' }, ['Corporate']));
-    guestSelect.appendChild(createEl('option', { value: 'education' }, ['Education / School']));
-    guestSelect.appendChild(createEl('option', { value: 'team' }, ['Team Building']));
-    guestSelect.appendChild(createEl('option', { value: 'hen_stag' }, ['Hen / Stag']));
-    guestSelect.appendChild(createEl('option', { value: 'other' }, ['Other']));
+    guestSelect.appendChild(createEl('option', { value: 'adult' }, ['Adult']));
+    guestSelect.appendChild(createEl('option', { value: 'youth' }, ['Youth']));
+    guestSelect.appendChild(createEl('option', { value: 'group' }, ['Group']));
     guestGroup.appendChild(guestSelect);
     colRight.appendChild(guestGroup);
-
-    var newsletterGroup = createEl('div', { class: 'hcf-field-group' });
-    var newsletterLabel = createEl('label', null, []);
-    var newsletterCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-newsletter' });
-    newsletterLabel.appendChild(newsletterCheckbox);
-    newsletterLabel.appendChild(document.createTextNode(' Add me to the How Stean Newsletter list'));
-    newsletterGroup.appendChild(newsletterLabel);
-    colRight.appendChild(newsletterGroup);
 
     cols.appendChild(colLeft);
     cols.appendChild(colRight);
     bookingForm.appendChild(cols);
 
-    var tosGroup = createEl('div', { class: 'hcf-field-group hcf-tos' });
-    var tosCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-tos' });
-    var tosLabel = createEl('label', { for: 'hcf-tos' }, [
-      ' I agree to the ',
-      createEl('a', { href: 'https://howstean.co.uk/terms-and-conditions/', target: '_blank', rel: 'noopener noreferrer' }, ['Terms and Conditions'])
-    ]);
-    tosGroup.appendChild(tosCheckbox);
-    tosGroup.appendChild(tosLabel);
-    bookingForm.appendChild(tosGroup);
+    var bottomBlock = createEl('div', { class: 'hcf-bottom-block' });
+
+    var tcGroup = createEl('div', { class: 'hcf-field-group hcf-field-terms' });
+    var tcLabel = createEl('label', null, []);
+    var tcCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-tc' });
+    tcLabel.appendChild(tcCheckbox);
+    tcLabel.appendChild(createEl('strong', null, ['I have read and agreed to the Terms of Service']));
+    tcGroup.appendChild(tcLabel);
+    tcGroup.appendChild(createEl('p', { class: 'hcf-help' }, ['If not tell customer they must do this now, if we dont hear back by the end of working day we presume they are happy to proceed.']));
+    bottomBlock.appendChild(tcGroup);
+
+    var optGroup = createEl('div', { class: 'hcf-field-group hcf-field-optin' });
+    var optLabel = createEl('label', null, []);
+    var optCheckbox = createEl('input', { type: 'checkbox', id: 'hcf-email-optin' });
+    optLabel.appendChild(optCheckbox);
+    optLabel.appendChild(createEl('strong', null, ['Keep up to date with our latest offers and events, by joining our friends list here']));
+    optGroup.appendChild(optLabel);
+    bottomBlock.appendChild(optGroup);
+
+    bookingForm.appendChild(bottomBlock);
 
     // Book button (enabled after we have a slip + form fields)
     bookBtn = createEl('button', { type: 'button', class: 'hcf-book-btn', disabled: 'disabled' }, ['Complete Booking & Pay']);
@@ -421,13 +421,16 @@
     }
 
     function normalizeOptions(field) {
-      var raw = field.options || field.choices || field.values || [];
+      var raw = field.options || field.choices || field.values || (field.meta && field.meta.options) || [];
       var opts = [];
 
       if (Array.isArray(raw)) {
         raw.forEach(function(opt) {
           if (opt && typeof opt === 'object') {
-            opts.push({ value: opt.value || opt.id || opt.name, label: opt.label || opt.name || opt.value });
+            opts.push({
+              value: opt.value || opt.id || opt.name,
+              label: opt.label || opt.name || opt.title || opt.value
+            });
           } else {
             opts.push({ value: opt, label: opt });
           }
@@ -436,7 +439,7 @@
         Object.keys(raw).forEach(function(key) {
           var val = raw[key];
           if (val && typeof val === 'object') {
-            opts.push({ value: val.value || key, label: val.label || val.name || val.value || key });
+            opts.push({ value: val.value || key, label: val.label || val.name || val.title || val.value || key });
           } else {
             opts.push({ value: key, label: val });
           }
@@ -471,20 +474,28 @@
     }
 
     function buildFieldControl(name, field) {
-      var type = (field.type || field.input || 'text').toLowerCase();
+      var typeKey = (field.type || field.input || field.html_type || field.widget || field.display || 'text').toLowerCase();
       var display = (field.display || field.widget || '').toLowerCase();
-      var htmlType = type;
-      if (type === 'spin' || type === 'number') htmlType = 'number';
-      if (type === 'phone') htmlType = 'tel';
-      if (type === 'checkbox') htmlType = 'checkbox';
+
+      // Normalise common Checkfront field types to browser input types
+      var htmlType = typeKey;
+      if (['spin', 'spinner', 'integer', 'int', 'float', 'decimal', 'number'].indexOf(typeKey) !== -1) htmlType = 'number';
+      if (['phone', 'tel'].indexOf(typeKey) !== -1) htmlType = 'tel';
+      if (typeKey === 'email') htmlType = 'email';
+      if (typeKey === 'checkbox') htmlType = 'checkbox';
+      if (typeKey === 'date') htmlType = 'date';
+      if (typeKey === 'time') htmlType = 'time';
+      if (display === 'textarea' || typeKey === 'textarea') htmlType = 'textarea';
+
+      var isSelect = ['select', 'option', 'dropdown', 'list', 'combo'].indexOf(typeKey) !== -1 || display === 'select';
+      var wantsRadio = typeKey === 'radio' || display === 'radio';
+      var options = normalizeOptions(field);
+      var isMultiCheckbox = (typeKey === 'checkbox' && options.length > 1) || display === 'checkboxes';
+
       var id = 'hcf-field-' + name;
       var control;
 
-      var options = normalizeOptions(field);
-      var wantsRadio = type === 'radio' || display === 'radio';
-      var isMultiCheckbox = (type === 'checkbox' && options.length > 1) || display === 'checkboxes';
-
-      if ((type === 'select' || type === 'option' || display === 'select') && options.length) {
+      if (isSelect && options.length) {
         control = createEl('select', { id: id, 'data-field-name': name });
         if (!field.required) {
           control.appendChild(createEl('option', { value: '' }, ['Please Select']));
@@ -518,69 +529,106 @@
           });
           control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
         });
-      } else if (type === 'checkbox') {
+      } else if (typeKey === 'checkbox') {
         control = createEl('input', { type: htmlType, id: id, 'data-field-name': name, value: '1' });
-      } else if (type === 'textarea') {
+      } else if (htmlType === 'textarea') {
         control = createEl('textarea', { id: id, 'data-field-name': name });
       } else {
         control = createEl('input', { type: htmlType, id: id, 'data-field-name': name });
       }
 
+      if (field.prefix) {
+        var prefix = createEl('span', { class: 'hcf-input-prefix' }, [field.prefix]);
+        var wrap = createEl('div', { class: 'hcf-input-wrap' }, [prefix, control]);
+        control = wrap;
+      }
+      if (field.suffix) {
+        var suffix = createEl('span', { class: 'hcf-input-suffix' }, [field.suffix]);
+        if (control.classList && control.classList.contains('hcf-input-wrap')) {
+          control.appendChild(suffix);
+        } else {
+          control = createEl('div', { class: 'hcf-input-wrap' }, [control, suffix]);
+        }
+      }
+
       if (field.placeholder && control.tagName) {
-        control.setAttribute('placeholder', field.placeholder);
+        if (control.classList && control.classList.contains('hcf-input-wrap')) {
+          var inner = control.querySelector('input,textarea,select');
+          if (inner) inner.setAttribute('placeholder', field.placeholder);
+        } else {
+          control.setAttribute('placeholder', field.placeholder);
+        }
       }
 
       var range = field.range || field.valid_range || field.validation;
-      if (range && control.tagName && control.tagName.toLowerCase() !== 'div') {
-        if (range.start) control.setAttribute('min', range.start);
-        if (range.end) control.setAttribute('max', range.end);
-        if (range.step) control.setAttribute('step', range.step);
+      if (range) {
+        var target = control;
+        if (control.classList && control.classList.contains('hcf-input-wrap')) {
+          target = control.querySelector('input,select,textarea');
+        }
+        if (target && target.tagName && target.tagName.toLowerCase() !== 'div') {
+          if (range.start) target.setAttribute('min', range.start);
+          if (range.end) target.setAttribute('max', range.end);
+          if (range.step) target.setAttribute('step', range.step);
+        }
       }
 
       var defaultVal = field.default;
       if (typeof defaultVal === 'undefined') defaultVal = field.value;
       var defaultArray = Array.isArray(defaultVal) ? defaultVal : [defaultVal];
 
-      if (control && control.tagName === 'SELECT' && typeof defaultVal !== 'undefined') {
-        Array.prototype.forEach.call(control.options, function(opt) {
-          if (defaultArray.indexOf(opt.value) !== -1) {
-            opt.selected = true;
+      function setValue(target, val) {
+        if (!target) return;
+        if (target.tagName === 'SELECT' && typeof val !== 'undefined') {
+          Array.prototype.forEach.call(target.options, function(opt) {
+            if (defaultArray.indexOf(opt.value) !== -1) {
+              opt.selected = true;
+            }
+          });
+        } else if (target.classList && target.classList.contains('hcf-radio-group')) {
+          var radios = target.querySelectorAll('input[type="radio"]');
+          Array.prototype.forEach.call(radios, function(input) {
+            if (defaultArray.indexOf(input.value) !== -1) {
+              input.checked = true;
+            }
+          });
+        } else if (target.classList && target.classList.contains('hcf-checkbox-group')) {
+          var checkboxes = target.querySelectorAll('input[type="checkbox"]');
+          Array.prototype.forEach.call(checkboxes, function(input) {
+            if (defaultArray.indexOf(input.value) !== -1) {
+              input.checked = true;
+            }
+          });
+        } else if (target.tagName === 'TEXTAREA') {
+          if (typeof val !== 'undefined') target.value = val;
+        } else if (target.tagName === 'INPUT') {
+          if (target.type === 'checkbox') {
+            if (val === true || val === '1' || val === 1) {
+              target.checked = true;
+            }
+          } else if (typeof val !== 'undefined') {
+            target.value = val;
           }
-        });
-      } else if (control && control.classList.contains('hcf-radio-group')) {
-        var radios = control.querySelectorAll('input[type="radio"]');
-        Array.prototype.forEach.call(radios, function(input) {
-          if (defaultArray.indexOf(input.value) !== -1) {
-            input.checked = true;
-          }
-        });
-      } else if (control && control.classList.contains('hcf-checkbox-group')) {
-        var checkboxes = control.querySelectorAll('input[type="checkbox"]');
-        Array.prototype.forEach.call(checkboxes, function(input) {
-          if (defaultArray.indexOf(input.value) !== -1) {
-            input.checked = true;
-          }
-        });
-      } else if (control && control.tagName === 'TEXTAREA') {
-        if (typeof defaultVal !== 'undefined') control.value = defaultVal;
-      } else if (control && control.tagName === 'INPUT') {
-        if (htmlType === 'checkbox') {
-          if (defaultVal === true || defaultVal === '1' || defaultVal === 1) {
-            control.checked = true;
-          }
-        } else if (typeof defaultVal !== 'undefined') {
-          control.value = defaultVal;
         }
       }
 
+      if (control.classList && control.classList.contains('hcf-input-wrap')) {
+        setValue(control.querySelector('input,select,textarea'), defaultVal);
+      } else {
+        setValue(control, defaultVal);
+      }
+
       if (field.required) {
-        if (control.tagName && control.tagName.toLowerCase() === 'div') {
+        if (control.tagName && control.tagName.toLowerCase() === 'div' && !control.classList.contains('hcf-input-wrap')) {
           control.setAttribute('data-field-required', '1');
           var groupedInputs = control.querySelectorAll('input');
           Array.prototype.forEach.call(groupedInputs, function(input) {
             input.setAttribute('data-field-required', '1');
             input.required = true;
           });
+        } else if (control.classList && control.classList.contains('hcf-input-wrap')) {
+          var innerInput = control.querySelector('input,select,textarea');
+          if (innerInput) innerInput.setAttribute('required', 'required');
         } else {
           control.setAttribute('required', 'required');
         }
@@ -594,6 +642,7 @@
       dynamicFieldsContainer.innerHTML = '';
 
       if (!params || typeof params !== 'object') {
+        optionsSection.style.display = 'none';
         return;
       }
 
@@ -606,11 +655,13 @@
         return oa - ob;
       });
 
+      optionsSection.style.display = names.length ? 'block' : 'none';
+
       names.forEach(function (name) {
         var field = params[name] || {};
         var group = createEl('div', { class: 'hcf-field-group' });
 
-        var labelText = field.label || name;
+        var labelText = field.label || field.name || name;
         if (field.required) {
           labelText += ' *';
         }
@@ -1070,6 +1121,51 @@ state.itemName = item.name || "";
         alert('Please check availability first.');
         return;
       }
+
+      var formPayload = {};
+      var staticMissing = [];
+
+      var staticFields = [
+        { id: 'hcf-first-name', key: 'customer_name_first', label: 'First Name', required: true },
+        { id: 'hcf-last-name', key: 'customer_name_last', label: 'Surname', required: true },
+        { id: 'hcf-email', key: 'customer_email', label: 'E-mail', required: true },
+        { id: 'hcf-phone', key: 'customer_phone', label: 'Phone', required: true },
+        { id: 'hcf-company', key: 'customer_company', label: 'Company Name', required: false },
+        { id: 'hcf-address', key: 'customer_address', label: 'First Line Billing Address', required: true },
+        { id: 'hcf-city', key: 'customer_city', label: 'Town/City', required: true },
+        { id: 'hcf-postal', key: 'customer_postal_zip', label: 'Postal / Zip', required: true },
+        { id: 'hcf-country', key: 'customer_country', label: 'Country', required: true },
+        { id: 'hcf-county', key: 'customer_province', label: 'County', required: true },
+        { id: 'hcf-hear', key: 'customer_hear_about', label: 'How Did You Hear About Us?', required: true },
+        { id: 'hcf-other', key: 'customer_hear_other', label: 'Other (please specify)', required: false },
+        { id: 'hcf-search', key: 'customer_search_terms', label: 'Search Engine Term', required: false },
+        { id: 'hcf-guest-type', key: 'customer_guest_type', label: 'Guest Type', required: true },
+        { id: 'hcf-email-optin', key: 'customer_marketing_optin', label: 'Marketing Opt-in', required: false, type: 'checkbox' },
+      ];
+
+      staticFields.forEach(function(fieldDef) {
+        var el = document.getElementById(fieldDef.id);
+        if (!el) return;
+        var val;
+        if ((fieldDef.type || el.type) === 'checkbox') {
+          val = el.checked ? '1' : '';
+        } else {
+          val = (el.value || '').trim();
+        }
+        if (fieldDef.required && !val) {
+          staticMissing.push(fieldDef.label || fieldDef.key);
+        }
+        if (val !== '') {
+          formPayload[fieldDef.key] = val;
+        }
+      });
+
+      var tcChecked = document.getElementById('hcf-tc') ? document.getElementById('hcf-tc').checked : false;
+      if (!tcChecked) {
+        staticMissing.push('Terms of Service agreement');
+      }
+      formPayload.customer_tos_agree = tcChecked ? '1' : '0';
+
       var formFields = dynamicFieldsContainer ? dynamicFieldsContainer.querySelectorAll('[data-field-name]') : [];
       var grouped = {};
 
@@ -1078,9 +1174,6 @@ state.itemName = item.name || "";
         if (!grouped[name]) grouped[name] = [];
         grouped[name].push(el);
       });
-
-      var formPayload = {};
-      var missing = [];
 
       Object.keys(grouped).forEach(function(name) {
         var inputs = grouped[name];
@@ -1094,7 +1187,6 @@ state.itemName = item.name || "";
         var value = '';
 
         if (inputs.length > 1) {
-          // Radio or checkbox groups
           if (type === 'radio') {
             inputs.forEach(function(el) {
               if (el.checked) value = el.value;
@@ -1128,64 +1220,18 @@ state.itemName = item.name || "";
         }
 
         if (required && (!value || (Array.isArray(value) && value.length === 0))) {
-          missing.push(name);
+          staticMissing.push(name);
         }
 
         formPayload[name] = value;
       });
-
-      // Static fields
-      var staticMissing = [];
-      var staticFields = [
-        { key: 'customer_first_name', id: 'hcf-first-name', label: 'First Name' },
-        { key: 'customer_last_name', id: 'hcf-last-name', label: 'Surname' },
-        { key: 'customer_email', id: 'hcf-email', label: 'E-mail' },
-        { key: 'customer_phone', id: 'hcf-phone', label: 'Phone' },
-        { key: 'company_name', id: 'hcf-company', label: 'Company Name', required: false },
-        { key: 'customer_address', id: 'hcf-address', label: 'First Line Billing Address' },
-        { key: 'customer_city', id: 'hcf-city', label: 'Town/City' },
-        { key: 'customer_postal_zip', id: 'hcf-postal', label: 'Postal / Zip' },
-        { key: 'customer_country', id: 'hcf-country', label: 'Country' },
-        { key: 'customer_region', id: 'hcf-county', label: 'County' },
-        { key: 'hear_about_us', id: 'hcf-hear', label: 'How Did You Hear About Us?' },
-        { key: 'hear_about_other', id: 'hcf-other', label: 'Other (please specify)', required: false },
-        { key: 'search_engine_term', id: 'hcf-search', label: 'Search Engine', required: false },
-        { key: 'guest_type', id: 'hcf-guest-type', label: 'Guest Type' },
-        { key: 'newsletter_optin', id: 'hcf-newsletter', label: 'Newsletter', type: 'checkbox', required: false },
-      ];
-
-      staticFields.forEach(function(fieldDef) {
-        var el = document.getElementById(fieldDef.id);
-        if (!el) return;
-        var value = '';
-        if ((fieldDef.type || el.type) === 'checkbox') {
-          value = el.checked ? (el.value || '1') : '';
-        } else {
-          value = (el.value || '').trim();
-        }
-        if ((fieldDef.required !== false) && !value) {
-          staticMissing.push(fieldDef.label || fieldDef.key);
-        }
-        formPayload[fieldDef.key] = value;
-      });
-
-      // Terms of Service check
-      var tosChecked = document.getElementById('hcf-tos');
-      if (!tosChecked || !tosChecked.checked) {
-        staticMissing.push('Terms of Service agreement');
-      }
 
       if (staticMissing.length) {
         alert('Please fill in all required fields: ' + staticMissing.join(', '));
         return;
       }
 
-      if (missing.length) {
-        alert('Please fill in all required fields: ' + missing.join(', '));
-        return;
-      }
-
-      var tosAgreed = tosChecked && tosChecked.checked;
+      var tosAgreed = tcChecked || formPayload.customer_tos_agree === '1' || formPayload.customer_tos_agree === 1 || formPayload.customer_tos_agree === true;
 
       var payload = {
         policy: { customer_tos_agree: tosAgreed ? 1 : 0 },
