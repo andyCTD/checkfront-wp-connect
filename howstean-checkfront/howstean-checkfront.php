@@ -2,12 +2,11 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.8.2
+ * Version: 1.8.5
  * Author: How Stean Gorge
  */
 
-wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' );
-// Inside a plugin
+wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' ); // Inside a plugin
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -177,7 +176,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.8.2',
+            '1.8.5',
             true
         );
 
@@ -334,7 +333,14 @@ class Howstean_Checkfront_Plugin {
 
     public function rest_create_booking( WP_REST_Request $request ) {
         $params = $request->get_json_params();
-        $slip   = isset( $params['slip'] ) ? sanitize_text_field( $params['slip'] ) : '';
+        $slip   = '';
+        if ( isset( $params['slip'] ) ) {
+            if ( is_array( $params['slip'] ) ) {
+                $slip = sanitize_text_field( reset( $params['slip'] ) );
+            } else {
+                $slip = sanitize_text_field( $params['slip'] );
+            }
+        }
         $form   = isset( $params['form'] ) && is_array( $params['form'] ) ? $params['form'] : [];
 
         // Normalized Terms of Service flag from multiple possible shapes
