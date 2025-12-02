@@ -675,6 +675,11 @@
         }
         var group = createEl('div', { class: 'hcf-field-group' });
 
+        // If Checkfront marks a field required via `req`, honour it.
+        if (field.req && typeof field.required === 'undefined') {
+          field.required = !!field.req;
+        }
+
         var labelText = field.label || field.lbl || field.name || field.title || name;
         if (field.required) {
           labelText += ' *';
