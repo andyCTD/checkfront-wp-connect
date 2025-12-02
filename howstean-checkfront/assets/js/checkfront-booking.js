@@ -31,6 +31,7 @@
       qty: 1,
       minQty: 1,
       maxQty: 60,
+      minNights: 1,
       slip: null,
       rated: null,
       itemName: null,
@@ -51,10 +52,6 @@
     var dynamicFieldsContainer, optionsSection;
 
     var wrapper = createEl('div', { class: 'howstean-checkfront-wrapper' });
-
-
-
-
 
     // Heading
     wrapper.appendChild(createEl('h4', null, ['Select Date & Participants']));
@@ -133,6 +130,29 @@
     endDateInput.value = endVal;
     endDateInput.min = endVal;
 
+    function formatDate(dateObj) {
+      if (!dateObj || isNaN(dateObj.getTime())) return '';
+      var y = dateObj.getFullYear();
+      var m = ('0' + (dateObj.getMonth() + 1)).slice(-2);
+      var d = ('0' + dateObj.getDate()).slice(-2);
+      return y + '-' + m + '-' + d;
+    }
+
+    function applyMinNightRule() {
+      if (!dateInput.value) return;
+      var start = new Date(dateInput.value);
+      if (isNaN(start.getTime())) return;
+
+      var minOffset = Math.max(1, parseInt(state.minNights, 10) || 1);
+      var nextDay = new Date(start.getTime() + minOffset * 24 * 60 * 60 * 1000);
+      var minEndStr = formatDate(nextDay);
+
+      endDateInput.min = minEndStr;
+      if (!endDateInput.value || endDateInput.value < minEndStr) {
+        endDateInput.value = minEndStr;
+      }
+    }
+
     // Helper: load rated availability for current date range & quantity
     function loadAvailability() {
       if (!dateInput.value) {
@@ -180,34 +200,17 @@
     // AUTO-REFRESH availability + timeslots when date changes
     dateInput.addEventListener('change', function () {
       if (!dateInput.value) return;
-      var start = new Date(dateInput.value);
-      if (!isNaN(start.getTime())) {
-        var nextDay = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-        var mm2 = ('0' + (nextDay.getMonth() + 1)).slice(-2);
-        var dd2 = ('0' + nextDay.getDate()).slice(-2);
-        var minEnd = nextDay.getFullYear() + '-' + mm2 + '-' + dd2;
-        if (!endDateInput.value || endDateInput.value < minEnd) {
-          endDateInput.value = minEnd;
-        }
-        endDateInput.min = minEnd;
-      }
+      applyMinNightRule();
       loadAvailability();
     });
 
     endDateInput.addEventListener('change', function () {
       if (!endDateInput.value || !dateInput.value) return;
-      if (endDateInput.value <= dateInput.value) {
-        var start = new Date(dateInput.value);
-        var nextDay = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-        var mm2 = ('0' + (nextDay.getMonth() + 1)).slice(-2);
-        var dd2 = ('0' + nextDay.getDate()).slice(-2);
-        endDateInput.value = nextDay.getFullYear() + '-' + mm2 + '-' + dd2;
-      }
+      applyMinNightRule();
       loadAvailability();
     });
 
-
-      dateGroup.appendChild(dateInput);
+    dateGroup.appendChild(dateInput);
     endGroup.appendChild(endDateInput);
 
     wrapper.appendChild(dateGroup);
@@ -420,6 +423,25 @@
       checkBtn.textContent = isLoading ? 'Checking…' : 'Check Availability & Price';
     }
 
+    function deriveMinNights(rate) {
+      var minNights = 1;
+      if (rate && rate.error) {
+        if (rate.error.data && rate.error.data.min_qty) {
+          minNights = Math.max(minNights, parseInt(rate.error.data.min_qty, 10) || 1);
+        }
+        if (rate.error.data && rate.error.data.min_nights) {
+          minNights = Math.max(minNights, parseInt(rate.error.data.min_nights, 10) || 1);
+        }
+        if (rate.error.title) {
+          var m = String(rate.error.title).match(/minimum of\s+(\d+)\s+night/i);
+          if (m && m[1]) {
+            minNights = Math.max(minNights, parseInt(m[1], 10) || 1);
+          }
+        }
+      }
+      return minNights;
+    }
+
     function normalizeOptions(field) {
       var raw = field.options || field.choices || field.values || (field.meta && field.meta.options) || [];
       var opts = [];
@@ -538,96 +560,88 @@
           });
           control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
         });
-      } else if (typeKey === 'checkbox') {
-        control = createEl('input', { type: htmlType, id: id, 'data-field-name': name, value: '1' });
       } else if (htmlType === 'textarea') {
         control = createEl('textarea', { id: id, 'data-field-name': name });
       } else {
         control = createEl('input', { type: htmlType, id: id, 'data-field-name': name });
       }
 
-      if (field.prefix) {
-        var prefix = createEl('span', { class: 'hcf-input-prefix' }, [field.prefix]);
-        var wrap = createEl('div', { class: 'hcf-input-wrap' }, [prefix, control]);
-        control = wrap;
-      }
-      if (field.suffix || priceSuffix) {
-        var suffixText = field.suffix || priceSuffix;
-        var suffix = createEl('span', { class: 'hcf-input-suffix' }, [suffixText]);
-        if (control.classList && control.classList.contains('hcf-input-wrap')) {
-          control.appendChild(suffix);
-        } else {
-          control = createEl('div', { class: 'hcf-input-wrap' }, [control, suffix]);
+      if (field.prefix || field.suffix) {
+        var wrapper = createEl('div', { class: 'hcf-affix-wrapper' });
+        if (field.prefix) wrapper.appendChild(createEl('span', { class: 'hcf-affix hcf-affix-prefix' }, [field.prefix]));
+        wrapper.appendChild(control);
+        if (field.suffix || priceSuffix) {
+          var suffixVal = field.suffix || priceSuffix;
+          wrapper.appendChild(createEl('span', { class: 'hcf-affix hcf-affix-suffix' }, [suffixVal]));
         }
+        control = wrapper;
       }
 
-      if (field.placeholder && control.tagName) {
-        if (control.classList && control.classList.contains('hcf-input-wrap')) {
-          var inner = control.querySelector('input,textarea,select');
-          if (inner) inner.setAttribute('placeholder', field.placeholder);
-        } else {
-          control.setAttribute('placeholder', field.placeholder);
+      var range = field.range || field.valid_range || field.validation || {};
+      if (typeof range === 'string') {
+        try { range = JSON.parse(range); } catch (e) { range = {}; }
+      }
+      if (!range || Object.keys(range).length === 0) {
+        if (typeof field.MIN !== 'undefined' || typeof field.MAX !== 'undefined') {
+          range = { start: field.MIN, end: field.MAX };
         }
       }
-
-      var range = field.range || field.valid_range || field.validation;
-      if (range) {
-        var target = control;
-        if (control.classList && control.classList.contains('hcf-input-wrap')) {
-          target = control.querySelector('input,select,textarea');
-        }
-        if (target && target.tagName && target.tagName.toLowerCase() !== 'div') {
-          if (range.start) target.setAttribute('min', range.start);
-          if (range.end) target.setAttribute('max', range.end);
-          if (range.step) target.setAttribute('step', range.step);
-        }
+      var min = range.start || range.min || range.minimum || field.min || field.qty_min;
+      var max = range.end || range.max || range.maximum || field.max || field.qty_max;
+      var step = range.step || field.step || ((htmlType === 'number' || htmlType === 'range') ? 1 : null);
+      var target = control.tagName === 'DIV' ? control.querySelector('input, textarea, select') : control;
+      if (range && target && target.tagName && target.tagName.toLowerCase() !== 'div') {
+        if (min !== undefined && min !== null) target.setAttribute('min', min);
+        if (max !== undefined && max !== null) target.setAttribute('max', max);
+        if (step !== null && step !== undefined) target.setAttribute('step', step);
+        if (typeof field.qty !== 'undefined') target.value = field.qty;
+        if (typeof field.def !== 'undefined') target.value = field.def;
       }
 
       var defaultVal = field.default;
       if (typeof defaultVal === 'undefined') defaultVal = field.value;
       var defaultArray = Array.isArray(defaultVal) ? defaultVal : [defaultVal];
 
-      function setValue(target, val) {
-        if (!target) return;
-        if (target.tagName === 'SELECT' && typeof val !== 'undefined') {
-          Array.prototype.forEach.call(target.options, function(opt) {
+      function setValue(targetEl, val) {
+        if (!targetEl) return;
+        if (targetEl.tagName === 'SELECT' && typeof val !== 'undefined') {
+          Array.prototype.forEach.call(targetEl.options, function(opt) {
             if (defaultArray.indexOf(opt.value) !== -1) {
               opt.selected = true;
             }
           });
-        } else if (target.classList && target.classList.contains('hcf-radio-group')) {
-          var radios = target.querySelectorAll('input[type="radio"]');
+        } else if (targetEl.classList && targetEl.classList.contains('hcf-radio-group')) {
+          var radios = targetEl.querySelectorAll('input[type="radio"]');
           Array.prototype.forEach.call(radios, function(input) {
             if (defaultArray.indexOf(input.value) !== -1) {
               input.checked = true;
             }
           });
-        } else if (target.classList && target.classList.contains('hcf-checkbox-group')) {
-          var checkboxes = target.querySelectorAll('input[type="checkbox"]');
+        } else if (targetEl.classList && targetEl.classList.contains('hcf-checkbox-group')) {
+          var checkboxes = targetEl.querySelectorAll('input[type="checkbox"]');
           Array.prototype.forEach.call(checkboxes, function(input) {
             if (defaultArray.indexOf(input.value) !== -1) {
               input.checked = true;
             }
           });
-        } else if (target.tagName === 'TEXTAREA') {
-          if (typeof val !== 'undefined') target.value = val;
-        } else if (target.tagName === 'INPUT') {
-          if (target.type === 'checkbox') {
+        } else if (targetEl.tagName === 'TEXTAREA') {
+          if (typeof val !== 'undefined') targetEl.value = val;
+        } else if (targetEl.tagName === 'INPUT') {
+          if (targetEl.type === 'checkbox') {
             if (val === true || val === '1' || val === 1) {
-              target.checked = true;
+              targetEl.checked = true;
             }
           } else if (typeof val !== 'undefined') {
-            target.value = val;
+            targetEl.value = val;
           }
         }
       }
 
-      if (control.classList && control.classList.contains('hcf-input-wrap')) {
-        setValue(control.querySelector('input,select,textarea'), defaultVal);
-      } else {
-        setValue(control, defaultVal);
-      }
+      setValue(target, defaultVal);
 
+      if (field.req && typeof field.required === 'undefined') {
+        field.required = !!field.req;
+      }
       if (field.required) {
         if (control.tagName && control.tagName.toLowerCase() === 'div' && !control.classList.contains('hcf-input-wrap')) {
           control.setAttribute('data-field-required', '1');
@@ -636,7 +650,7 @@
             input.setAttribute('data-field-required', '1');
             input.required = true;
           });
-        } else if (control.classList && control.classList.contains('hcf-input-wrap')) {
+        } else if (control.querySelector) {
           var innerInput = control.querySelector('input,select,textarea');
           if (innerInput) innerInput.setAttribute('required', 'required');
         } else {
@@ -674,11 +688,6 @@
           return;
         }
         var group = createEl('div', { class: 'hcf-field-group' });
-
-        // If Checkfront marks a field required via `req`, honour it.
-        if (field.req && typeof field.required === 'undefined') {
-          field.required = !!field.req;
-        }
 
         var labelText = field.label || field.lbl || field.name || field.title || name;
         if (field.required) {
@@ -890,11 +899,11 @@
     function showRated(data) {
       availabilityBox.innerHTML = '';
 
-    // update title text
-var titleNode = document.querySelector(".hcf-activity-title");
-if (titleNode && state.itemName) {
-    titleNode.textContent = state.itemName;
-}
+      // update title text
+      var titleNode = document.querySelector(".hcf-activity-title");
+      if (titleNode && state.itemName) {
+        titleNode.textContent = state.itemName;
+      }
 
       if (!data || !data.item) {
         availabilityBox.textContent = 'No availability data returned.';
@@ -903,15 +912,14 @@ if (titleNode && state.itemName) {
 
       var item = data.item;
 
-// store item name
-state.itemName = item.name || "";
+      // store item name
+      state.itemName = item.name || "";
 
       var priceMap = null;
       if (item.rate && item.rate.summary && item.rate.summary.price && item.rate.summary.price.param) {
         priceMap = item.rate.summary.price.param;
       }
       renderDynamicFields(collectParams(item), priceMap);
-
 
       if (item.rules && typeof item.rules === 'string') {
         try { item.rules = JSON.parse(item.rules); } catch (e) {}
@@ -934,6 +942,9 @@ state.itemName = item.name || "";
         availabilityBox.textContent = 'No rated response from Checkfront.';
         return;
       }
+
+      state.minNights = deriveMinNights(rate);
+      applyMinNightRule();
 
       // Save rated data and base slip (handle string or array slips)
       state.rated = item;
@@ -1019,7 +1030,11 @@ state.itemName = item.name || "";
         }
       }
 
-      availabilityBox.appendChild(createEl('p', null, ['Status: ' + (rate.status || 'Unknown')]));
+      var statusText = rate.status || 'Unknown';
+      if (rate.error && rate.error.title) {
+        statusText = rate.error.title;
+      }
+      availabilityBox.appendChild(createEl('p', null, ['Status: ' + statusText]));
       if (typeof rate.available !== 'undefined') {
         availabilityBox.appendChild(createEl('p', null, ['Remaining capacity: ' + rate.available]));
       }
@@ -1028,10 +1043,10 @@ state.itemName = item.name || "";
         var s = rate.summary;
         var ul = createEl('ul');
 
-            // ⭐ Add Event Title at top
-    if (state.itemName) {
-        ul.appendChild(createEl('li', null, ['Event: ' + state.itemName]));
-    }
+        // ⭐ Add Event Title at top
+        if (state.itemName) {
+          ul.appendChild(createEl('li', null, ['Event: ' + state.itemName]));
+        }
 
         if (s.date)  ul.appendChild(createEl('li', null, ['Date: ' + s.date]));
         if (s.end_date && s.end_date !== s.date) {
@@ -1066,11 +1081,10 @@ state.itemName = item.name || "";
         }
 
         if (s.details) {
-          var tmp = document.createElement('div');
-          tmp.innerHTML = s.details;
-          ul.appendChild(createEl('li', null, ['Details: ' + tmp.textContent]));
+          var tmp2 = document.createElement('div');
+          tmp2.innerHTML = s.details;
+          ul.appendChild(createEl('li', null, ['Details: ' + tmp2.textContent]));
         }
-
 
         if (s.price && s.price.total) {
           var p = document.createElement('div');
@@ -1078,7 +1092,6 @@ state.itemName = item.name || "";
           ul.appendChild(createEl('li', null, ['Total price: ' + p.textContent]));
         }
         availabilityBox.appendChild(ul);
-
       }
 
       bookingForm.style.display = 'block';
