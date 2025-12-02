@@ -2,7 +2,7 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.8.6
+ * Version: 1.8.7
  * Author: How Stean Gorge
  */
 
@@ -176,7 +176,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.8.6',
+            '1.8.7',
             true
         );
 
@@ -244,7 +244,9 @@ class Howstean_Checkfront_Plugin {
         $api  = $this->get_api();
         $item = $api->get( 'item/' . $item_id );
         if ( is_wp_error( $item ) ) {
-            return $item;
+            $data   = $item->get_error_data();
+            $status = is_array( $data ) && isset( $data['status'] ) ? intval( $data['status'] ) : 502;
+            return new WP_Error( $item->get_error_code(), $item->get_error_message(), [ 'status' => $status ] );
         }
         if ( empty( $item['item'] ) ) {
             return new WP_Error( 'no_item', 'Unable to load item from Checkfront.', [ 'status' => 500 ] );
@@ -286,7 +288,9 @@ class Howstean_Checkfront_Plugin {
 
         $rated = $api->get( 'item/' . $item_id, $params );
         if ( is_wp_error( $rated ) ) {
-            return $rated;
+            $data   = $rated->get_error_data();
+            $status = is_array( $data ) && isset( $data['status'] ) ? intval( $data['status'] ) : 502;
+            return new WP_Error( $rated->get_error_code(), $rated->get_error_message(), [ 'status' => $status ] );
         }
         if ( ! empty( $item['item']['param'] ) && isset( $rated['item'] ) && empty( $rated['item']['param'] ) ) {
             $rated['item']['param'] = $item['item']['param'];
@@ -300,7 +304,16 @@ class Howstean_Checkfront_Plugin {
         ];
         $form_response = $api->get( 'booking/form', $form_params );
 
-        if ( ! is_wp_error( $form_response ) && isset( $form_response['form'] ) ) {
+        if ( is_wp_error( $form_response ) ) {
+            // Keep the rated data but expose the error to the caller so the UI can surface it.
+            $data   = $form_response->get_error_data();
+            $status = is_array( $data ) && isset( $data['status'] ) ? intval( $data['status'] ) : 502;
+            $rated['form_error'] = [
+                'code'    => $form_response->get_error_code(),
+                'message' => $form_response->get_error_message(),
+                'status'  => $status,
+            ];
+        } elseif ( isset( $form_response['form'] ) ) {
             $fields = [];
             $form_fields = $form_response['form'];
 
@@ -443,10 +456,10 @@ class Howstean_Checkfront_API {
 
     public function get( $path, $query = [] ) {
         if ( empty( $this->base_url ) ) {
-            return new WP_Error( 'no_config', 'Checkfront API not configured.' );
+            return new WP_Error( 'no_config', 'Checkfront API not configured.', [ 'status' => 500 ] );
         }
 
-        $url = $this->base_url + ltrim( $path, '/' );
+        $url = $this->base_url . ltrim( $path, '/' );
         if ( ! empty( $query ) ) {
             $url = add_query_arg( $query, $url );
         }
@@ -460,7 +473,7 @@ class Howstean_Checkfront_API {
         );
 
         if ( is_wp_error( $response ) ) {
-            return $response;
+            return new WP_Error( $response->get_error_code(), $response->get_error_message(), [ 'status' => 502 ] );
         }
 
         $code = wp_remote_retrieve_response_code( $response );
@@ -471,7 +484,7 @@ class Howstean_Checkfront_API {
             return new WP_Error( 'api_error', 'Checkfront API error', [ 'status' => $code, 'body' => $data ] );
         }
         if ( null === $data ) {
-            return new WP_Error( 'bad_json', 'Unable to decode Checkfront response', [ 'body' => $body ] );
+            return new WP_Error( 'bad_json', 'Unable to decode Checkfront response', [ 'status' => 502, 'body' => $body ] );
         }
 
         return $data;
@@ -479,7 +492,7 @@ class Howstean_Checkfront_API {
 
     public function post( $path, $body = [] ) {
         if ( empty( $this->base_url ) ) {
-            return new WP_Error( 'no_config', 'Checkfront API not configured.' );
+            return new WP_Error( 'no_config', 'Checkfront API not configured.', [ 'status' => 500 ] );
         }
 
         $url = $this->base_url . ltrim( $path, '/' );
@@ -494,7 +507,7 @@ class Howstean_Checkfront_API {
         );
 
         if ( is_wp_error( $response ) ) {
-            return $response;
+            return new WP_Error( $response->get_error_code(), $response->get_error_message(), [ 'status' => 502 ] );
         }
 
         $code = wp_remote_retrieve_response_code( $response );
@@ -505,7 +518,7 @@ class Howstean_Checkfront_API {
             return new WP_Error( 'api_error', 'Checkfront API error', [ 'status' => $code, 'body' => $data ] );
         }
         if ( null === $data ) {
-            return new WP_Error( 'bad_json', 'Unable to decode Checkfront response', [ 'body' => $body_raw ] );
+            return new WP_Error( 'bad_json', 'Unable to decode Checkfront response', [ 'status' => 502, 'body' => $body_raw ] );
         }
 
         return $data;
