@@ -2,7 +2,7 @@
 /**
  * Plugin Name: How Stean Checkfront
  * Description: Custom inline Checkfront checkout with full booking form.
- * Version: 1.8.8
+ * Version: 1.8.9
  * Author: How Stean Gorge
  */
 
@@ -176,7 +176,7 @@ class Howstean_Checkfront_Plugin {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/js/checkfront-booking.js',
             [],
-            '1.8.8',
+            '1.8.9',
             true
         );
 
