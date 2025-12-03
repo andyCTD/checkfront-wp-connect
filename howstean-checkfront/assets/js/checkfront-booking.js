@@ -46,6 +46,7 @@
     var currentCalDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
     var dateInput, endDateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
+    var bookingStartInput, bookingEndInput;
     var timeslotGroup, timeslotSelect;
     var checkBtn, bookBtn;
     var calendarContainer, calMonthLabel, calBody;
@@ -129,6 +130,14 @@
     dateInput.min = startVal;
     endDateInput.value = endVal;
     endDateInput.min = endVal;
+    if (bookingStartInput) {
+      bookingStartInput.value = startVal;
+      bookingStartInput.min = startVal;
+    }
+    if (bookingEndInput) {
+      bookingEndInput.value = endVal;
+      bookingEndInput.min = endVal;
+    }
 
     function formatDate(dateObj) {
       if (!dateObj || isNaN(dateObj.getTime())) return '';
@@ -150,6 +159,17 @@
       endDateInput.min = minEndStr;
       if (!endDateInput.value || endDateInput.value < minEndStr) {
         endDateInput.value = minEndStr;
+      }
+
+      if (bookingStartInput) {
+        bookingStartInput.value = dateInput.value;
+        bookingStartInput.min = dateInput.min;
+      }
+      if (bookingEndInput) {
+        bookingEndInput.min = minEndStr;
+        if (!bookingEndInput.value || bookingEndInput.value < minEndStr) {
+          bookingEndInput.value = minEndStr;
+        }
       }
     }
 
@@ -215,6 +235,48 @@
 
     wrapper.appendChild(dateGroup);
     wrapper.appendChild(endGroup);
+
+    // ===== Booking date inputs (mirroring Checkfront fields) =====
+    var bookingDatesSection = createEl('div', { class: 'hcf-section-dates' });
+    bookingDatesSection.appendChild(createEl('h4', null, ['Booking Dates']));
+    var bookingDateRow = createEl('div', { class: 'hcf-date-row' });
+
+    var startWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
+    startWrap.appendChild(createEl('label', { for: 'hcf-booking-start' }, ['Start']));
+    bookingStartInput = createEl('input', { type: 'date', id: 'hcf-booking-start' });
+    startWrap.appendChild(bookingStartInput);
+    bookingDateRow.appendChild(startWrap);
+
+    var endWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
+    endWrap.appendChild(createEl('label', { for: 'hcf-booking-end' }, ['End']));
+    bookingEndInput = createEl('input', { type: 'date', id: 'hcf-booking-end' });
+    endWrap.appendChild(bookingEndInput);
+    bookingDateRow.appendChild(endWrap);
+
+    var timeslotWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
+    timeslotWrap.appendChild(createEl('label', { for: 'hcf-timeslot-booking' }, ['Time']));
+    var timeslotDropdown = createEl('select', { id: 'hcf-timeslot-booking' });
+    timeslotWrap.appendChild(timeslotDropdown);
+    bookingDateRow.appendChild(timeslotWrap);
+
+    bookingDatesSection.appendChild(bookingDateRow);
+    wrapper.appendChild(bookingDatesSection);
+
+    // Keep booking start/end in sync with main inputs
+    bookingStartInput.addEventListener('change', function() {
+      if (bookingStartInput.value && bookingStartInput.value !== dateInput.value) {
+        dateInput.value = bookingStartInput.value;
+        var evt = new Event('change', { bubbles: true });
+        dateInput.dispatchEvent(evt);
+      }
+    });
+    bookingEndInput.addEventListener('change', function() {
+      if (bookingEndInput.value && bookingEndInput.value !== endDateInput.value) {
+        endDateInput.value = bookingEndInput.value;
+        var evt2 = new Event('change', { bubbles: true });
+        endDateInput.dispatchEvent(evt2);
+      }
+    });
 
     // ===== Quantity selector =====
     var qtyGroup = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
@@ -1030,6 +1092,34 @@
         }
       }
 
+      // Populate booking-timeslot dropdown
+      if (timeslotDropdown) {
+        timeslotDropdown.innerHTML = '';
+        if (state.timeslots.length) {
+          state.timeslots.forEach(function(ts, idx) {
+            var start = ts.start_time || '';
+            var end = ts.end_time || '';
+            var label = start && end ? (start + ' - ' + end) : (start || end || 'Time slot');
+            timeslotDropdown.appendChild(createEl('option', { value: String(idx) }, [label]));
+          });
+          timeslotDropdown.value = String(state.selectedTimeslotIndex);
+        } else {
+          timeslotDropdown.appendChild(createEl('option', { value: '' }, ['No timeslots']));
+        }
+      }
+
+      // Sync booking timeslot change -> main timeslot select
+      if (timeslotDropdown) {
+        timeslotDropdown.onchange = function() {
+          var idx = parseInt(this.value, 10);
+          if (!isNaN(idx) && timeslotSelect) {
+            timeslotSelect.value = String(idx);
+            var evt = new Event('change', { bubbles: true });
+            timeslotSelect.dispatchEvent(evt);
+          }
+        };
+      }
+
       var statusText = rate.status || 'Unknown';
       if (rate.error && rate.error.title) {
         statusText = rate.error.title;
@@ -1126,6 +1216,10 @@
           if (timeLi) {
             timeLi.textContent = 'Time: ' + label;
           }
+        }
+
+        if (timeslotDropdown) {
+          timeslotDropdown.value = String(idx);
         }
       });
     }
