@@ -32,6 +32,7 @@
       minQty: 1,
       maxQty: 60,
       minNights: 1,
+      isNightly: false,
       slip: null,
       rated: null,
       itemName: null,
@@ -46,13 +47,17 @@
     var currentCalDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
     var dateInput, endDateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
-    var bookingStartInput, bookingEndInput;
+    var bookingStartInput, bookingEndInput, bookingDatesSection, startWrap, endWrap;
     var timeslotGroup, timeslotSelect;
     var checkBtn, bookBtn;
     var calendarContainer, calMonthLabel, calBody;
     var dynamicFieldsContainer, optionsSection;
 
     var wrapper = createEl('div', { class: 'howstean-checkfront-wrapper' });
+
+
+
+
 
     // Heading
     wrapper.appendChild(createEl('h4', null, ['Select Date & Participants']));
@@ -147,10 +152,37 @@
       return y + '-' + m + '-' + d;
     }
 
+    function updateModeVisibility() {
+      if (!endGroup || !endWrap || !bookingDatesSection) return;
+      if (state.isNightly) {
+        endGroup.style.display = '';
+        endWrap.style.display = '';
+      } else {
+        endGroup.style.display = 'none';
+        endWrap.style.display = 'none';
+        if (endDateInput) endDateInput.value = dateInput.value;
+        if (bookingEndInput) bookingEndInput.value = dateInput.value;
+        state.minNights = 1;
+      }
+    }
+
     function applyMinNightRule() {
       if (!dateInput.value) return;
       var start = new Date(dateInput.value);
       if (isNaN(start.getTime())) return;
+
+      if (!state.isNightly) {
+        if (endDateInput) {
+          endDateInput.value = dateInput.value;
+          endDateInput.min = dateInput.value;
+        }
+        if (bookingEndInput) {
+          bookingEndInput.value = dateInput.value;
+          bookingEndInput.min = dateInput.value;
+        }
+        if (bookingStartInput) bookingStartInput.value = dateInput.value;
+        return;
+      }
 
       var minOffset = Math.max(1, parseInt(state.minNights, 10) || 1);
       var nextDay = new Date(start.getTime() + minOffset * 24 * 60 * 60 * 1000);
@@ -230,6 +262,25 @@
       loadAvailability();
     });
 
+    if (bookingStartInput) {
+      bookingStartInput.addEventListener('change', function() {
+        if (!bookingStartInput.value) return;
+        dateInput.value = bookingStartInput.value;
+        applyMinNightRule();
+        loadAvailability();
+      });
+    }
+
+    if (bookingEndInput) {
+      bookingEndInput.addEventListener('change', function() {
+        if (!bookingEndInput.value) return;
+        endDateInput.value = bookingEndInput.value;
+        applyMinNightRule();
+        loadAvailability();
+      });
+    }
+
+
     dateGroup.appendChild(dateInput);
     endGroup.appendChild(endDateInput);
 
@@ -237,17 +288,17 @@
     wrapper.appendChild(endGroup);
 
     // ===== Booking date inputs (mirroring Checkfront fields) =====
-    var bookingDatesSection = createEl('div', { class: 'hcf-section-dates' });
+    bookingDatesSection = createEl('div', { class: 'hcf-section-dates' });
     bookingDatesSection.appendChild(createEl('h4', null, ['Booking Dates']));
     var bookingDateRow = createEl('div', { class: 'hcf-date-row' });
 
-    var startWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
+    startWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
     startWrap.appendChild(createEl('label', { for: 'hcf-booking-start' }, ['Start']));
     bookingStartInput = createEl('input', { type: 'date', id: 'hcf-booking-start' });
     startWrap.appendChild(bookingStartInput);
     bookingDateRow.appendChild(startWrap);
 
-    var endWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
+    endWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
     endWrap.appendChild(createEl('label', { for: 'hcf-booking-end' }, ['End']));
     bookingEndInput = createEl('input', { type: 'date', id: 'hcf-booking-end' });
     endWrap.appendChild(bookingEndInput);
@@ -1005,6 +1056,8 @@
         return;
       }
 
+      state.isNightly = (item.unit || '').toUpperCase() === 'N';
+      updateModeVisibility();
       state.minNights = deriveMinNights(rate);
       applyMinNightRule();
 
