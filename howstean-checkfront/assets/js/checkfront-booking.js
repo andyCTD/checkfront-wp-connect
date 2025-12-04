@@ -1331,8 +1331,8 @@
       var staticMissing = [];
 
       var staticFields = [
-        { id: 'hcf-first-name', key: 'customer_name_first', label: 'First Name', required: true },
-        { id: 'hcf-last-name', key: 'customer_name_last', label: 'Surname', required: true },
+        { id: 'hcf-first-name', key: 'customer_first_name', label: 'First Name', required: true },
+        { id: 'hcf-last-name', key: 'customer_last_name', label: 'Surname', required: true },
         { id: 'hcf-email', key: 'customer_email', label: 'E-mail', required: true },
         { id: 'hcf-phone', key: 'customer_phone', label: 'Phone', required: true },
         { id: 'hcf-company', key: 'customer_company', label: 'Company Name', required: false },
@@ -1341,35 +1341,41 @@
         { id: 'hcf-postal', key: 'customer_postal_zip', label: 'Postal / Zip', required: true },
         { id: 'hcf-country', key: 'customer_country', label: 'Country', required: true },
         { id: 'hcf-county', key: 'customer_province', label: 'County', required: true },
-        { id: 'hcf-hear', key: 'customer_hear_about', label: 'How Did You Hear About Us?', required: true },
-        { id: 'hcf-other', key: 'customer_hear_other', label: 'Other (please specify)', required: false },
-        { id: 'hcf-search', key: 'customer_search_terms', label: 'Search Engine Term', required: false },
-        { id: 'hcf-guest-type', key: 'customer_guest_type', label: 'Guest Type', required: true },
-        { id: 'hcf-email-optin', key: 'customer_marketing_optin', label: 'Marketing Opt-in', required: false, type: 'checkbox' },
+        { id: 'hcf-hear', key: 'how_did_you_hear_about_us', label: 'How Did You Hear About Us?', required: true },
+        { id: 'hcf-other', key: 'other_please_specify', label: 'Other (please specify)', required: false },
+        { id: 'hcf-search', key: 'search_engine_google_yahoo_etc', label: 'Search Engine Term', required: false },
+        { id: 'hcf-guest-type', key: 'guest_type', label: 'Guest Type', required: true },
+        { id: 'hcf-email-optin', key: 'customer_email_optin', label: 'Marketing Opt-in', required: false, type: 'checkbox' },
       ];
 
-      staticFields.forEach(function(fieldDef) {
-        var el = document.getElementById(fieldDef.id);
-        if (!el) return;
-        var val;
-        if ((fieldDef.type || el.type) === 'checkbox') {
-          val = el.checked ? '1' : '';
-        } else {
-          val = (el.value || '').trim();
-        }
-        if (fieldDef.required && !val) {
-          staticMissing.push(fieldDef.label || fieldDef.key);
-        }
-        if (val !== '') {
-          formPayload[fieldDef.key] = val;
-        }
-      });
+staticFields.forEach(function(fieldDef) {
+  var el = document.getElementById(fieldDef.id);
+  if (!el) return;
+  var val;
+  if ((fieldDef.type || el.type) === 'checkbox') {
+    val = el.checked ? '1' : '';
+  } else {
+    val = (el.value || '').trim();
+  }
+  if (fieldDef.required && !val) {
+    staticMissing.push(fieldDef.label || fieldDef.key);
+  }
+  if (val !== '') {
+    formPayload[fieldDef.key] = val;
+  }
+});
 
-      var tcChecked = document.getElementById('hcf-tc') ? document.getElementById('hcf-tc').checked : false;
-      if (!tcChecked) {
-        staticMissing.push('Terms of Service agreement');
-      }
-      formPayload.customer_tos_agree = tcChecked ? '1' : '0';
+var tcChecked = document.getElementById('hcf-tc')
+  ? document.getElementById('hcf-tc').checked
+  : false;
+
+if (!tcChecked) {
+  staticMissing.push('Terms of Service agreement');
+}
+
+formPayload.tc = tcChecked ? '1' : '0';
+formPayload.customer_tos_agree = tcChecked ? '1' : '0';
+
 
       var formFields = dynamicFieldsContainer ? dynamicFieldsContainer.querySelectorAll('[data-field-name]') : [];
       var grouped = {};
