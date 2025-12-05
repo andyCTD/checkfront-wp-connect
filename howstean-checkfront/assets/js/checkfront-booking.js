@@ -60,7 +60,7 @@
 
 
     // Heading
-    wrapper.appendChild(createEl('h4', null, ['Select Date & Participants']));
+    wrapper.appendChild(createEl('h4', null, ['Availability']));
 
     /* =====================
      * CALENDAR UI
