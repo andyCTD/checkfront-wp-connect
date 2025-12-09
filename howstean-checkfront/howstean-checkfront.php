@@ -6,7 +6,8 @@
  * Author: How Stean Gorge
  */
 
-wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' ); // Inside a plugin
+wp_enqueue_style( 'checkfront-styles.css', plugins_url( '/assets/css/checkfront-styles.css', __FILE__ ), false, '1.0', 'all' );
+// Inside a plugin
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -230,6 +231,19 @@ class Howstean_Checkfront_Plugin {
         $date    = $request->get_param( 'date' );
         $end     = $request->get_param( 'end_date' );
         $qty     = intval( $request->get_param( 'qty' ) );
+        $param   = $request->get_param( 'param' );
+        $start_time = $request->get_param( 'start_time' );
+        $event_id   = $request->get_param( 'event_id' );
+        if ( empty( $event_id ) ) {
+            $event_id = $request->get_param( 'event' );
+        }
+
+        $param_values = [];
+        if ( is_array( $param ) ) {
+            foreach ( $param as $key => $val ) {
+                $param_values[ sanitize_key( $key ) ] = intval( $val );
+            }
+        }
 
         if ( ! $item_id ) {
             return new WP_Error( 'missing_item', 'Item ID is required.', [ 'status' => 400 ] );
@@ -237,7 +251,14 @@ class Howstean_Checkfront_Plugin {
         if ( empty( $date ) ) {
             return new WP_Error( 'missing_date', 'Date is required.', [ 'status' => 400 ] );
         }
-        if ( $qty < 1 ) {
+        $has_param_qty = false;
+        foreach ( $param_values as $val ) {
+            if ( intval( $val ) > 0 ) {
+                $has_param_qty = true;
+                break;
+            }
+        }
+        if ( $qty < 1 && ! $has_param_qty ) {
             return new WP_Error( 'missing_qty', 'At least one participant is required.', [ 'status' => 400 ] );
         }
 
@@ -250,18 +271,6 @@ class Howstean_Checkfront_Plugin {
         }
         if ( empty( $item['item'] ) ) {
             return new WP_Error( 'no_item', 'Unable to load item from Checkfront.', [ 'status' => 500 ] );
-        }
-
-        // Determine parameter name from rules (e.g. perperson).
-        $param_name = 'perperson';
-        if ( ! empty( $item['item']['rules'] ) ) {
-            $rules = json_decode( $item['item']['rules'], true );
-            if ( isset( $rules['param'] ) && is_array( $rules['param'] ) ) {
-                $keys = array_keys( $rules['param'] );
-                if ( ! empty( $keys ) ) {
-                    $param_name = $keys[0];
-                }
-            }
         }
 
         $timestamp = strtotime( $date );
@@ -281,10 +290,36 @@ class Howstean_Checkfront_Plugin {
         $cf_end_date = date( 'Ymd', $end_timestamp );
 
         $params = [
-            'start_date'                 => $cf_date,
-            'end_date'                   => $cf_end_date,
-            'param[' . $param_name . ']' => $qty,
+            'start_date' => $cf_date,
+            'end_date'   => $cf_end_date,
         ];
+
+        if ( $has_param_qty ) {
+            foreach ( $param_values as $key => $val ) {
+                $params[ 'param[' . $key . ']' ] = $val;
+            }
+        } else {
+            // Determine parameter name from rules (e.g. perperson) for legacy qty fallback.
+            $param_name = 'perperson';
+            if ( ! empty( $item['item']['rules'] ) ) {
+                $rules = json_decode( $item['item']['rules'], true );
+                if ( isset( $rules['param'] ) && is_array( $rules['param'] ) ) {
+                    $keys = array_keys( $rules['param'] );
+                    if ( ! empty( $keys ) ) {
+                        $param_name = $keys[0];
+                    }
+                }
+            }
+
+            $params[ 'param[' . $param_name . ']' ] = $qty;
+        }
+
+        if ( ! empty( $start_time ) ) {
+            $params['start_time'] = sanitize_text_field( $start_time );
+        }
+        if ( ! empty( $event_id ) ) {
+            $params['event_id'] = sanitize_text_field( $event_id );
+        }
 
         $rated = $api->get( 'item/' . $item_id, $params );
         if ( is_wp_error( $rated ) ) {
@@ -302,6 +337,17 @@ class Howstean_Checkfront_Plugin {
             'start_date' => $cf_date,
             'end_date'   => $cf_end_date,
         ];
+        foreach ( $params as $key => $val ) {
+            if ( strpos( $key, 'param[' ) === 0 ) {
+                $form_params[ $key ] = $val;
+            }
+        }
+        if ( ! empty( $params['start_time'] ) ) {
+            $form_params['start_time'] = $params['start_time'];
+        }
+        if ( ! empty( $params['event_id'] ) ) {
+            $form_params['event_id'] = $params['event_id'];
+        }
         $form_response = $api->get( 'booking/form', $form_params );
 
         if ( is_wp_error( $form_response ) ) {
@@ -355,6 +401,14 @@ class Howstean_Checkfront_Plugin {
             }
         }
         $form   = isset( $params['form'] ) && is_array( $params['form'] ) ? $params['form'] : [];
+        $start_time = isset( $params['start_time'] ) ? sanitize_text_field( $params['start_time'] ) : '';
+        $event_id   = isset( $params['event_id'] ) ? sanitize_text_field( $params['event_id'] ) : '';
+        $param_values = [];
+        if ( isset( $params['param'] ) && is_array( $params['param'] ) ) {
+            foreach ( $params['param'] as $key => $val ) {
+                $param_values[ sanitize_key( $key ) ] = intval( $val );
+            }
+        }
 
         // Normalized Terms of Service flag from multiple possible shapes
         $tos_flag = 0;
@@ -374,6 +428,15 @@ class Howstean_Checkfront_Plugin {
 
         // 1) Create booking session with the SLIP.
         $session_body     = [ 'slip[]' => $slip ];
+        foreach ( $param_values as $key => $val ) {
+            $session_body[ 'param[' . $key . ']' ] = $val;
+        }
+        if ( ! empty( $start_time ) ) {
+            $session_body['start_time'] = $start_time;
+        }
+        if ( ! empty( $event_id ) ) {
+            $session_body['event_id'] = $event_id;
+        }
         $session_response = $api->post( 'booking/session', $session_body );
         if ( is_wp_error( $session_response ) ) {
             return $session_response;
@@ -411,11 +474,20 @@ class Howstean_Checkfront_Plugin {
         }
 
         $create_body = [
-            'session_id'        => $session_id,
+            'session_id'         => $session_id,
             // Top-level T&Cs field as used by the standard Checkfront iframe
             'customer_tos_agree' => $tos_flag,
-            'form'              => $form_fields,
+            'form'               => $form_fields,
         ];
+        foreach ( $param_values as $key => $val ) {
+            $create_body[ 'param[' . $key . ']' ] = $val;
+        }
+        if ( ! empty( $start_time ) ) {
+            $create_body['start_time'] = $start_time;
+        }
+        if ( ! empty( $event_id ) ) {
+            $create_body['event_id'] = $event_id;
+        }
 
         $create_response = $api->post( 'booking/create', $create_body );
 
