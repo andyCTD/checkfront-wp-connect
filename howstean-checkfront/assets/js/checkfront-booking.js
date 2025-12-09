@@ -31,11 +31,8 @@
       qty: 1,
       minQty: 1,
       maxQty: 60,
-      minNights: 1,
-      isNightly: false,
       slip: null,
       rated: null,
-      itemName: null,
       timeslots: [],
       baseSlip: null,
       selectedTimeslotIndex: 0,
@@ -46,21 +43,15 @@
     // We render month views starting from the 1st of the month
     var currentCalDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    var dateInput, endDateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
-    var bookingStartInput, bookingEndInput, bookingDatesSection, startWrap, endWrap;
+    var dateInput, qtyValueEl, availabilityBox, bookingForm, debugBox;
     var timeslotGroup, timeslotSelect;
     var checkBtn, bookBtn;
     var calendarContainer, calMonthLabel, calBody;
-    var dynamicFieldsContainer, optionsSection;
 
     var wrapper = createEl('div', { class: 'howstean-checkfront-wrapper' });
 
-
-
-
-
     // Heading
-    wrapper.appendChild(createEl('h4', null, ['Availability']));
+    wrapper.appendChild(createEl('h2', null, ['Select Date & Participants']));
 
     /* =====================
      * CALENDAR UI
@@ -113,111 +104,20 @@
     var dateGroup = createEl('div', {
       class: 'hcf-field-group hcf-field-inline hcf-date-group'
     });
-    dateGroup.appendChild(createEl('label', null, ['Check-in']));
+    dateGroup.appendChild(createEl('label', null, ['Selected Date']));
     dateInput = createEl('input', { type: 'date', id: 'hcf-date' });
-
-    var endGroup = createEl('div', {
-      class: 'hcf-field-group hcf-field-inline hcf-date-group'
-    });
-    endGroup.appendChild(createEl('label', null, ['Check-out']));
-    endDateInput = createEl('input', { type: 'date', id: 'hcf-end-date' });
 
     var yyyy = today.getFullYear();
     var mm = ('0' + (today.getMonth() + 1)).slice(-2);
     var dd = ('0' + today.getDate()).slice(-2);
-    var startVal = yyyy + '-' + mm + '-' + dd;
-    var tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    var tmm = ('0' + (tomorrow.getMonth() + 1)).slice(-2);
-    var tdd = ('0' + tomorrow.getDate()).slice(-2);
-    var endVal = tomorrow.getFullYear() + '-' + tmm + '-' + tdd;
+    dateInput.value = yyyy + '-' + mm + '-' + dd;
+    dateInput.min = dateInput.value;
 
-    dateInput.value = startVal;
-    dateInput.min = startVal;
-    endDateInput.value = endVal;
-    endDateInput.min = endVal;
-    if (bookingStartInput) {
-      bookingStartInput.value = startVal;
-      bookingStartInput.min = startVal;
-    }
-    if (bookingEndInput) {
-      bookingEndInput.value = endVal;
-      bookingEndInput.min = endVal;
-    }
-
-    function formatDate(dateObj) {
-      if (!dateObj || isNaN(dateObj.getTime())) return '';
-      var y = dateObj.getFullYear();
-      var m = ('0' + (dateObj.getMonth() + 1)).slice(-2);
-      var d = ('0' + dateObj.getDate()).slice(-2);
-      return y + '-' + m + '-' + d;
-    }
-
-    function updateModeVisibility() {
-      if (!endGroup || !endWrap || !bookingDatesSection) return;
-      if (state.isNightly) {
-        endGroup.style.display = '';
-        endWrap.style.display = '';
-      } else {
-        endGroup.style.display = 'none';
-        endWrap.style.display = 'none';
-        if (endDateInput) endDateInput.value = dateInput.value;
-        if (bookingEndInput) bookingEndInput.value = dateInput.value;
-        state.minNights = 1;
-      }
-    }
-
-    function applyMinNightRule() {
+    // AUTO-REFRESH availability + timeslots when date changes
+    dateInput.addEventListener('change', function () {
       if (!dateInput.value) return;
-      var start = new Date(dateInput.value);
-      if (isNaN(start.getTime())) return;
-
-      if (!state.isNightly) {
-        if (endDateInput) {
-          endDateInput.value = dateInput.value;
-          endDateInput.min = dateInput.value;
-        }
-        if (bookingEndInput) {
-          bookingEndInput.value = dateInput.value;
-          bookingEndInput.min = dateInput.value;
-        }
-        if (bookingStartInput) bookingStartInput.value = dateInput.value;
-        return;
-      }
-
-      var minOffset = Math.max(1, parseInt(state.minNights, 10) || 1);
-      var nextDay = new Date(start.getTime() + minOffset * 24 * 60 * 60 * 1000);
-      var minEndStr = formatDate(nextDay);
-
-      endDateInput.min = minEndStr;
-      if (!endDateInput.value || endDateInput.value < minEndStr) {
-        endDateInput.value = minEndStr;
-      }
-
-      if (bookingStartInput) {
-        bookingStartInput.value = dateInput.value;
-        bookingStartInput.min = dateInput.min;
-      }
-      if (bookingEndInput) {
-        bookingEndInput.min = minEndStr;
-        if (!bookingEndInput.value || bookingEndInput.value < minEndStr) {
-          bookingEndInput.value = minEndStr;
-        }
-      }
-    }
-
-    // Helper: load rated availability for current date range & quantity
-    function loadAvailability() {
-      if (!dateInput.value) {
-        alert('Please choose a check-in date.');
-        return;
-      }
-      if (!endDateInput.value) {
-        alert('Please choose a check-out date.');
-        return;
-      }
 
       var dateYmd = dateInput.value.replace(/-/g, '');
-      var endYmd = endDateInput.value ? endDateInput.value.replace(/-/g, '') : dateYmd;
       var qty = state.qty;
 
       setLoading(true);
@@ -225,7 +125,6 @@
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(dateYmd) +
-        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=' + encodeURIComponent(qty);
 
       fetch(url, {
@@ -247,87 +146,10 @@
         .finally(function() {
           setLoading(false);
         });
-    }
-
-    // AUTO-REFRESH availability + timeslots when date changes
-    dateInput.addEventListener('change', function () {
-      if (!dateInput.value) return;
-      applyMinNightRule();
-      loadAvailability();
     });
-
-    endDateInput.addEventListener('change', function () {
-      if (!endDateInput.value || !dateInput.value) return;
-      applyMinNightRule();
-      loadAvailability();
-    });
-
-    if (bookingStartInput) {
-      bookingStartInput.addEventListener('change', function() {
-        if (!bookingStartInput.value) return;
-        dateInput.value = bookingStartInput.value;
-        applyMinNightRule();
-        loadAvailability();
-      });
-    }
-
-    if (bookingEndInput) {
-      bookingEndInput.addEventListener('change', function() {
-        if (!bookingEndInput.value) return;
-        endDateInput.value = bookingEndInput.value;
-        applyMinNightRule();
-        loadAvailability();
-      });
-    }
-
 
     dateGroup.appendChild(dateInput);
-    endGroup.appendChild(endDateInput);
-
     wrapper.appendChild(dateGroup);
-    wrapper.appendChild(endGroup);
-
-    // ===== Booking date inputs (mirroring Checkfront fields) =====
-    bookingDatesSection = createEl('div', { class: 'hcf-section-dates' });
-    bookingDatesSection.appendChild(createEl('h4', null, ['Booking Dates']));
-    var bookingDateRow = createEl('div', { class: 'hcf-date-row' });
-
-    startWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
-    startWrap.appendChild(createEl('label', { for: 'hcf-booking-start' }, ['Start']));
-    bookingStartInput = createEl('input', { type: 'date', id: 'hcf-booking-start' });
-    startWrap.appendChild(bookingStartInput);
-    bookingDateRow.appendChild(startWrap);
-
-    endWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
-    endWrap.appendChild(createEl('label', { for: 'hcf-booking-end' }, ['End']));
-    bookingEndInput = createEl('input', { type: 'date', id: 'hcf-booking-end' });
-    endWrap.appendChild(bookingEndInput);
-    bookingDateRow.appendChild(endWrap);
-
-    var timeslotWrap = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
-    timeslotWrap.appendChild(createEl('label', { for: 'hcf-timeslot-booking' }, ['Time']));
-    var timeslotDropdown = createEl('select', { id: 'hcf-timeslot-booking' });
-    timeslotWrap.appendChild(timeslotDropdown);
-    bookingDateRow.appendChild(timeslotWrap);
-
-    bookingDatesSection.appendChild(bookingDateRow);
-    wrapper.appendChild(bookingDatesSection);
-
-    // Keep booking start/end in sync with main inputs
-    bookingStartInput.addEventListener('change', function() {
-      if (bookingStartInput.value && bookingStartInput.value !== dateInput.value) {
-        dateInput.value = bookingStartInput.value;
-        var evt = new Event('change', { bubbles: true });
-        dateInput.dispatchEvent(evt);
-      }
-    });
-    bookingEndInput.addEventListener('change', function() {
-      if (bookingEndInput.value && bookingEndInput.value !== endDateInput.value) {
-        endDateInput.value = bookingEndInput.value;
-        var evt2 = new Event('change', { bubbles: true });
-        endDateInput.dispatchEvent(evt2);
-      }
-    });
 
     // ===== Quantity selector =====
     var qtyGroup = createEl('div', { class: 'hcf-field-group hcf-field-inline' });
@@ -357,20 +179,12 @@
     availabilityBox = createEl('div', { class: 'hcf-availability' });
     wrapper.appendChild(availabilityBox);
 
-    // ===== Booking form (dynamic options + customer details) =====
+    // ===== Booking form =====
     bookingForm = createEl('div', { class: 'hcf-booking-form' });
     bookingForm.style.display = 'none';
-
-    // Options pulled from Checkfront item parameters
-    optionsSection = createEl('div', { class: 'hcf-section-options' });
-    optionsSection.appendChild(createEl('h3', null, ['Booking Options']));
-    dynamicFieldsContainer = createEl('div', { class: 'hcf-dynamic-fields' });
-    optionsSection.appendChild(dynamicFieldsContainer);
-    bookingForm.appendChild(optionsSection);
-
-    // Customer details (static booking form fields)
     bookingForm.appendChild(createEl('h3', null, ['Your Details']));
 
+    // Two-column layout container
     var cols = createEl('div', { class: 'hcf-two-cols' });
     var colLeft = createEl('div', { class: 'hcf-col hcf-col-left' });
     var colRight = createEl('div', { class: 'hcf-col hcf-col-right' });
@@ -382,6 +196,7 @@
       return g;
     }
 
+    // Left column fields (match Checkfront form)
     colLeft.appendChild(field('First Name *', 'hcf-first-name', 'text'));
     colLeft.appendChild(field('Surname *', 'hcf-last-name', 'text'));
     colLeft.appendChild(field('E-mail *', 'hcf-email', 'email'));
@@ -391,6 +206,8 @@
     colLeft.appendChild(field('Town/City *', 'hcf-city', 'text'));
     colLeft.appendChild(field('Postal / Zip *', 'hcf-postal', 'text'));
 
+    // Right column fields
+    // Country is hidden / forced to GB, but we show a disabled text so user sees UK.
     var countryGroup = createEl('div', { class: 'hcf-field-group' });
     countryGroup.appendChild(createEl('label', { for: 'hcf-country-display' }, ['Country *']));
     var countryDisplay = createEl('input', {
@@ -408,6 +225,7 @@
     countryGroup.appendChild(countryHidden);
     colRight.appendChild(countryGroup);
 
+    // County (Region) select
     var countyGroup = createEl('div', { class: 'hcf-field-group' });
     countyGroup.appendChild(createEl('label', { for: 'hcf-county' }, ['County *']));
     var countySelect = createEl('select', { id: 'hcf-county' });
@@ -428,6 +246,7 @@
     countyGroup.appendChild(countySelect);
     colRight.appendChild(countyGroup);
 
+    // How did you hear about us
     var hearGroup = createEl('div', { class: 'hcf-field-group' });
     hearGroup.appendChild(createEl('label', { for: 'hcf-hear' }, ['How Did You Hear About Us? *']));
     var hearSelect = createEl('select', { id: 'hcf-hear' });
@@ -439,18 +258,21 @@
     hearGroup.appendChild(hearSelect);
     colRight.appendChild(hearGroup);
 
+    // Other please specify
     var otherGroup = createEl('div', { class: 'hcf-field-group' });
     otherGroup.appendChild(createEl('label', { for: 'hcf-other' }, ['Other (please specify)']));
     var otherInput = createEl('input', { type: 'text', id: 'hcf-other' });
     otherGroup.appendChild(otherInput);
     colRight.appendChild(otherGroup);
 
+    // Search engine term
     var searchGroup = createEl('div', { class: 'hcf-field-group' });
     searchGroup.appendChild(createEl('label', { for: 'hcf-search' }, ['Search Engine (can you remember your search term?)']));
     var searchInput = createEl('input', { type: 'text', id: 'hcf-search' });
     searchGroup.appendChild(searchInput);
     colRight.appendChild(searchGroup);
 
+    // Guest type
     var guestGroup = createEl('div', { class: 'hcf-field-group' });
     guestGroup.appendChild(createEl('label', { for: 'hcf-guest-type' }, ['Guest Type *']));
     var guestSelect = createEl('select', { id: 'hcf-guest-type' });
@@ -465,6 +287,7 @@
     cols.appendChild(colRight);
     bookingForm.appendChild(cols);
 
+    // Full-width bottom section: Terms & Conditions + Email opt-in
     var bottomBlock = createEl('div', { class: 'hcf-bottom-block' });
 
     var tcGroup = createEl('div', { class: 'hcf-field-group hcf-field-terms' });
@@ -486,7 +309,7 @@
 
     bookingForm.appendChild(bottomBlock);
 
-    // Book button (enabled after we have a slip + form fields)
+    // Book button
     bookBtn = createEl('button', { type: 'button', class: 'hcf-book-btn', disabled: 'disabled' }, ['Complete Booking & Pay']);
     bookingForm.appendChild(bookBtn);
     wrapper.appendChild(bookingForm);
@@ -513,9 +336,6 @@
       if (state.qty > state.minQty) {
         state.qty--;
         updateQtyDisplay();
-        if (dateInput && dateInput.value) {
-          loadAvailability();
-        }
       }
     });
 
@@ -523,9 +343,6 @@
       if (state.qty < state.maxQty) {
         state.qty++;
         updateQtyDisplay();
-        if (dateInput && dateInput.value) {
-          loadAvailability();
-        }
       }
     });
 
@@ -534,304 +351,6 @@
       checkBtn.disabled = isLoading;
       bookBtn.disabled = isLoading || !state.slip;
       checkBtn.textContent = isLoading ? 'Checking…' : 'Check Availability & Price';
-    }
-
-    function deriveMinNights(rate) {
-      var minNights = 1;
-      if (rate && rate.error) {
-        if (rate.error.data && rate.error.data.min_qty) {
-          minNights = Math.max(minNights, parseInt(rate.error.data.min_qty, 10) || 1);
-        }
-        if (rate.error.data && rate.error.data.min_nights) {
-          minNights = Math.max(minNights, parseInt(rate.error.data.min_nights, 10) || 1);
-        }
-        if (rate.error.title) {
-          var m = String(rate.error.title).match(/minimum of\s+(\d+)\s+night/i);
-          if (m && m[1]) {
-            minNights = Math.max(minNights, parseInt(m[1], 10) || 1);
-          }
-        }
-      }
-      return minNights;
-    }
-
-    function normalizeOptions(field) {
-      var raw = field.options || field.choices || field.values || (field.meta && field.meta.options) || [];
-      var opts = [];
-
-      if (Array.isArray(raw)) {
-        raw.forEach(function(opt) {
-          if (opt && typeof opt === 'object') {
-            opts.push({
-              value: opt.value || opt.id || opt.name,
-              label: opt.label || opt.name || opt.title || opt.value
-            });
-          } else {
-            opts.push({ value: opt, label: opt });
-          }
-        });
-      } else if (typeof raw === 'object' && raw !== null) {
-        Object.keys(raw).forEach(function(key) {
-          var val = raw[key];
-          if (val && typeof val === 'object') {
-            opts.push({ value: val.value || key, label: val.label || val.name || val.title || val.value || key });
-          } else {
-            opts.push({ value: key, label: val });
-          }
-        });
-      }
-
-      return opts;
-    }
-
-    function isNumericConfig(field) {
-      if (!field || typeof field !== 'object') return false;
-      if (typeof field.MIN !== 'undefined' || typeof field.MAX !== 'undefined') return true;
-      if (typeof field.def !== 'undefined' && !isNaN(field.def)) return true;
-      if (typeof field.qty !== 'undefined' && !isNaN(field.qty)) return true;
-      if (field.range && (field.range.start || field.range.end)) return true;
-      return false;
-    }
-
-    function collectParams(item) {
-      if (!item || typeof item !== 'object') return {};
-      var params = item.param || item.parameters || item.options || item._booking_form || null;
-      if (!params && item.form && typeof item.form === 'object') {
-        params = item.form;
-      }
-      if (!params && item.booking && item.booking.form) {
-        params = item.booking.form;
-      }
-      // Some APIs return an array of fields; convert to keyed object
-      if (Array.isArray(params)) {
-        var obj = {};
-        params.forEach(function (f, idx) {
-          if (f && f.id) {
-            obj[f.id] = f;
-          } else {
-            obj['field_' + idx] = f;
-          }
-        });
-        params = obj;
-      }
-      return params || {};
-    }
-
-    function buildFieldControl(name, field, priceSuffix) {
-      var typeKey = (field.type || field.input || field.html_type || field.widget || field.display || 'text').toLowerCase();
-      var display = (field.display || field.widget || '').toLowerCase();
-
-      // Normalise common Checkfront field types to browser input types
-      var htmlType = typeKey;
-      if (['spin', 'spinner', 'integer', 'int', 'float', 'decimal', 'number'].indexOf(typeKey) !== -1 || isNumericConfig(field)) htmlType = 'number';
-      if (['phone', 'tel'].indexOf(typeKey) !== -1) htmlType = 'tel';
-      if (typeKey === 'email') htmlType = 'email';
-      if (typeKey === 'checkbox') htmlType = 'checkbox';
-      if (typeKey === 'date') htmlType = 'date';
-      if (typeKey === 'time') htmlType = 'time';
-      if (display === 'textarea' || typeKey === 'textarea') htmlType = 'textarea';
-
-      var isSelect = ['select', 'option', 'dropdown', 'list', 'combo'].indexOf(typeKey) !== -1 || display === 'select';
-      var wantsRadio = typeKey === 'radio' || display === 'radio';
-      var options = normalizeOptions(field);
-      var isMultiCheckbox = (typeKey === 'checkbox' && options.length > 1) || display === 'checkboxes';
-
-      var id = 'hcf-field-' + name;
-      var control;
-
-      if (isSelect && options.length) {
-        control = createEl('select', { id: id, 'data-field-name': name });
-        if (!field.required) {
-          control.appendChild(createEl('option', { value: '' }, ['Please Select']));
-        }
-        options.forEach(function(opt) {
-          control.appendChild(createEl('option', { value: opt.value }, [opt.label]));
-        });
-      } else if (wantsRadio && options.length) {
-        control = createEl('div', { class: 'hcf-radio-group', id: id });
-        options.forEach(function(opt, idx) {
-          var inputId = id + '-opt-' + idx;
-          var input = createEl('input', {
-            type: 'radio',
-            id: inputId,
-            name: id,
-            'data-field-name': name,
-            value: opt.value
-          });
-          control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
-        });
-      } else if (isMultiCheckbox && options.length) {
-        control = createEl('div', { class: 'hcf-checkbox-group', id: id });
-        options.forEach(function(opt, idx) {
-          var inputId = id + '-chk-' + idx;
-          var input = createEl('input', {
-            type: 'checkbox',
-            id: inputId,
-            name: id,
-            'data-field-name': name,
-            value: opt.value
-          });
-          control.appendChild(createEl('label', { for: inputId }, [input, ' ', opt.label]));
-        });
-      } else if (htmlType === 'textarea') {
-        control = createEl('textarea', { id: id, 'data-field-name': name });
-      } else {
-        control = createEl('input', { type: htmlType, id: id, 'data-field-name': name });
-      }
-
-      if (field.prefix || field.suffix) {
-        var wrapper = createEl('div', { class: 'hcf-affix-wrapper' });
-        if (field.prefix) wrapper.appendChild(createEl('span', { class: 'hcf-affix hcf-affix-prefix' }, [field.prefix]));
-        wrapper.appendChild(control);
-        if (field.suffix || priceSuffix) {
-          var suffixVal = field.suffix || priceSuffix;
-          wrapper.appendChild(createEl('span', { class: 'hcf-affix hcf-affix-suffix' }, [suffixVal]));
-        }
-        control = wrapper;
-      }
-
-      var range = field.range || field.valid_range || field.validation || {};
-      if (typeof range === 'string') {
-        try { range = JSON.parse(range); } catch (e) { range = {}; }
-      }
-      if (!range || Object.keys(range).length === 0) {
-        if (typeof field.MIN !== 'undefined' || typeof field.MAX !== 'undefined') {
-          range = { start: field.MIN, end: field.MAX };
-        }
-      }
-      var min = range.start || range.min || range.minimum || field.min || field.qty_min;
-      var max = range.end || range.max || range.maximum || field.max || field.qty_max;
-      var step = range.step || field.step || ((htmlType === 'number' || htmlType === 'range') ? 1 : null);
-      var target = control.tagName === 'DIV' ? control.querySelector('input, textarea, select') : control;
-      if (range && target && target.tagName && target.tagName.toLowerCase() !== 'div') {
-        if (min !== undefined && min !== null) target.setAttribute('min', min);
-        if (max !== undefined && max !== null) target.setAttribute('max', max);
-        if (step !== null && step !== undefined) target.setAttribute('step', step);
-        if (typeof field.qty !== 'undefined') target.value = field.qty;
-        if (typeof field.def !== 'undefined') target.value = field.def;
-      }
-
-      var defaultVal = field.default;
-      if (typeof defaultVal === 'undefined') defaultVal = field.value;
-      var defaultArray = Array.isArray(defaultVal) ? defaultVal : [defaultVal];
-
-      function setValue(targetEl, val) {
-        if (!targetEl) return;
-        if (targetEl.tagName === 'SELECT' && typeof val !== 'undefined') {
-          Array.prototype.forEach.call(targetEl.options, function(opt) {
-            if (defaultArray.indexOf(opt.value) !== -1) {
-              opt.selected = true;
-            }
-          });
-        } else if (targetEl.classList && targetEl.classList.contains('hcf-radio-group')) {
-          var radios = targetEl.querySelectorAll('input[type="radio"]');
-          Array.prototype.forEach.call(radios, function(input) {
-            if (defaultArray.indexOf(input.value) !== -1) {
-              input.checked = true;
-            }
-          });
-        } else if (targetEl.classList && targetEl.classList.contains('hcf-checkbox-group')) {
-          var checkboxes = targetEl.querySelectorAll('input[type="checkbox"]');
-          Array.prototype.forEach.call(checkboxes, function(input) {
-            if (defaultArray.indexOf(input.value) !== -1) {
-              input.checked = true;
-            }
-          });
-        } else if (targetEl.tagName === 'TEXTAREA') {
-          if (typeof val !== 'undefined') targetEl.value = val;
-        } else if (targetEl.tagName === 'INPUT') {
-          if (targetEl.type === 'checkbox') {
-            if (val === true || val === '1' || val === 1) {
-              targetEl.checked = true;
-            }
-          } else if (typeof val !== 'undefined') {
-            targetEl.value = val;
-          }
-        }
-      }
-
-      setValue(target, defaultVal);
-
-      if (field.req && typeof field.required === 'undefined') {
-        field.required = !!field.req;
-      }
-      if (field.required) {
-        if (control.tagName && control.tagName.toLowerCase() === 'div' && !control.classList.contains('hcf-input-wrap')) {
-          control.setAttribute('data-field-required', '1');
-          var groupedInputs = control.querySelectorAll('input');
-          Array.prototype.forEach.call(groupedInputs, function(input) {
-            input.setAttribute('data-field-required', '1');
-            input.required = true;
-          });
-        } else if (control.querySelector) {
-          var innerInput = control.querySelector('input,select,textarea');
-          if (innerInput) innerInput.setAttribute('required', 'required');
-        } else {
-          control.setAttribute('required', 'required');
-        }
-      }
-
-      return control;
-    }
-
-    function renderDynamicFields(params, priceMap) {
-      if (!dynamicFieldsContainer) return;
-      dynamicFieldsContainer.innerHTML = '';
-
-      if (!params || typeof params !== 'object') {
-        optionsSection.style.display = 'none';
-        return;
-      }
-
-      var names = Object.keys(params);
-      names.sort(function(a, b) {
-        var fa = params[a] || {};
-        var fb = params[b] || {};
-        var oa = parseInt(fa.order || fa.weight || fa.position || fa.sort || 0, 10);
-        var ob = parseInt(fb.order || fb.weight || fb.position || fb.sort || 0, 10);
-        return oa - ob;
-      });
-
-      optionsSection.style.display = names.length ? 'block' : 'none';
-
-      names.forEach(function (name) {
-        var field = params[name] || {};
-        // Skip hidden/locked fields that aren’t customer-facing
-        if (field.hide === 1 || field.customer_hide === 1) {
-          return;
-        }
-        var group = createEl('div', { class: 'hcf-field-group' });
-
-        var labelText = field.label || field.lbl || field.name || field.title || name;
-        if (field.required) {
-          labelText += ' *';
-        }
-        group.appendChild(createEl('label', { for: 'hcf-field-' + name }, [labelText]));
-
-        var priceSuffix = null;
-        if (priceMap && priceMap[name]) {
-          var tmp = document.createElement('div');
-          tmp.innerHTML = String(priceMap[name]);
-          priceSuffix = 'x ' + tmp.textContent.trim();
-        }
-
-        var control = buildFieldControl(name, field, priceSuffix);
-        group.appendChild(control);
-
-        var help = field.instructions || field.instruction || field.description || field.help;
-        if (help) {
-          group.appendChild(createEl('p', { class: 'hcf-help' }, [help]));
-        }
-
-        if (field.prefix || field.suffix) {
-          var addon = createEl('p', { class: 'hcf-help' }, []);
-          if (field.prefix) addon.appendChild(document.createTextNode(String(field.prefix)));
-          if (field.suffix) addon.appendChild(document.createTextNode(' ' + String(field.suffix)));
-          group.appendChild(addon);
-        }
-
-        dynamicFieldsContainer.appendChild(group);
-      });
     }
 
     // Convert Date -> "YYYYMMDD"
@@ -844,23 +363,9 @@
 
     // Load availability for a single day and colour the calendar cell
     function loadDayStatus(ymd, cell) {
-      var endYmd = ymd;
-      if (endDateInput && endDateInput.value) {
-        endYmd = endDateInput.value.replace(/-/g, '');
-        if (parseInt(endYmd, 10) <= parseInt(ymd, 10)) {
-          // enforce a minimum one-night stay when previewing cells
-          var y = parseInt(ymd.slice(0, 4), 10);
-          var m = parseInt(ymd.slice(4, 6), 10) - 1;
-          var d = parseInt(ymd.slice(6, 8), 10);
-          var nextDay = new Date(y, m, d + 1);
-          endYmd = ymdFromDate(nextDay);
-        }
-      }
-
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(ymd) +
-        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=1';
 
       fetch(url, {
@@ -882,17 +387,10 @@
           var available = (typeof rate.available !== 'undefined')
             ? parseInt(rate.available, 10)
             : null;
-          // Prefer per-day status when present (handles min-duration errors)
-          if (rate.dates && rate.dates[ymd] && rate.dates[ymd].status) {
-            status = String(rate.dates[ymd].status).toUpperCase();
-            if (rate.dates[ymd].stock && typeof rate.dates[ymd].stock.A !== 'undefined') {
-              available = parseInt(rate.dates[ymd].stock.A, 10);
-            }
-          }
 
           cell.classList.remove('hcf-cal-closed', 'hcf-cal-available', 'hcf-cal-soldout');
 
-          if ((status === 'AVAILABLE' || status === 'A') && (available === null || available > 0)) {
+          if (status === 'AVAILABLE' && (available === null || available > 0)) {
             cell.classList.add('hcf-cal-available');
           } else {
             cell.classList.add('hcf-cal-soldout');
@@ -1012,27 +510,12 @@
     function showRated(data) {
       availabilityBox.innerHTML = '';
 
-      // update title text
-      var titleNode = document.querySelector(".hcf-activity-title");
-      if (titleNode && state.itemName) {
-        titleNode.textContent = state.itemName;
-      }
-
       if (!data || !data.item) {
         availabilityBox.textContent = 'No availability data returned.';
         return;
       }
 
       var item = data.item;
-
-      // store item name
-      state.itemName = item.name || "";
-
-      var priceMap = null;
-      if (item.rate && item.rate.summary && item.rate.summary.price && item.rate.summary.price.param) {
-        priceMap = item.rate.summary.price.param;
-      }
-      renderDynamicFields(collectParams(item), priceMap);
 
       if (item.rules && typeof item.rules === 'string') {
         try { item.rules = JSON.parse(item.rules); } catch (e) {}
@@ -1056,18 +539,9 @@
         return;
       }
 
-      state.isNightly = (item.unit || '').toUpperCase() === 'N';
-      updateModeVisibility();
-      state.minNights = deriveMinNights(rate);
-      applyMinNightRule();
-
-      // Save rated data and base slip (handle string or array slips)
+      // Save rated data and base slip
       state.rated = item;
-      if (Array.isArray(rate.slip) && rate.slip.length) {
-        state.baseSlip = rate.slip[0];
-      } else {
-        state.baseSlip = rate.slip || null;
-      }
+      state.baseSlip = rate.slip || null;
       state.slip = state.baseSlip || null;
       bookBtn.disabled = !state.slip;
 
@@ -1145,39 +619,7 @@
         }
       }
 
-      // Populate booking-timeslot dropdown
-      if (timeslotDropdown) {
-        timeslotDropdown.innerHTML = '';
-        if (state.timeslots.length) {
-          state.timeslots.forEach(function(ts, idx) {
-            var start = ts.start_time || '';
-            var end = ts.end_time || '';
-            var label = start && end ? (start + ' - ' + end) : (start || end || 'Time slot');
-            timeslotDropdown.appendChild(createEl('option', { value: String(idx) }, [label]));
-          });
-          timeslotDropdown.value = String(state.selectedTimeslotIndex);
-        } else {
-          timeslotDropdown.appendChild(createEl('option', { value: '' }, ['No timeslots']));
-        }
-      }
-
-      // Sync booking timeslot change -> main timeslot select
-      if (timeslotDropdown) {
-        timeslotDropdown.onchange = function() {
-          var idx = parseInt(this.value, 10);
-          if (!isNaN(idx) && timeslotSelect) {
-            timeslotSelect.value = String(idx);
-            var evt = new Event('change', { bubbles: true });
-            timeslotSelect.dispatchEvent(evt);
-          }
-        };
-      }
-
-      var statusText = rate.status || 'Unknown';
-      if (rate.error && rate.error.title) {
-        statusText = rate.error.title;
-      }
-      availabilityBox.appendChild(createEl('p', null, ['Status: ' + statusText]));
+      availabilityBox.appendChild(createEl('p', null, ['Status: ' + (rate.status || 'Unknown')]));
       if (typeof rate.available !== 'undefined') {
         availabilityBox.appendChild(createEl('p', null, ['Remaining capacity: ' + rate.available]));
       }
@@ -1185,50 +627,23 @@
       if (rate.summary) {
         var s = rate.summary;
         var ul = createEl('ul');
-
-        // ⭐ Add Event Title at top
-        if (state.itemName) {
-          ul.appendChild(createEl('li', null, ['Event: ' + state.itemName]));
-        }
-
         if (s.date)  ul.appendChild(createEl('li', null, ['Date: ' + s.date]));
-        if (s.end_date && s.end_date !== s.date) {
-          ul.appendChild(createEl('li', null, ['Check-out: ' + s.end_date]));
-          var startDateObj = new Date(s.date.replace(/-/g, '/'));
-          var endDateObj = new Date(s.end_date.replace(/-/g, '/'));
-          if (!isNaN(startDateObj) && !isNaN(endDateObj)) {
-            var nights = Math.round((endDateObj - startDateObj) / (1000 * 60 * 60 * 24));
-            if (nights > 0) {
-              ul.appendChild(createEl('li', null, ['Nights: ' + nights]));
-            }
-          }
-        }
-
-        // Show currently selected time slot (if any)
-        if (state.timeslots && state.timeslots.length) {
-          var selIndex = (typeof state.selectedTimeslotIndex === 'number' &&
-                          state.selectedTimeslotIndex >= 0 &&
-                          state.selectedTimeslotIndex < state.timeslots.length)
-                        ? state.selectedTimeslotIndex
-                        : 0;
-          var tsSel = state.timeslots[selIndex];
-          if (tsSel) {
-            var start = tsSel.start_time || '';
-            var end   = tsSel.end_time   || '';
-            var tsLabel = start && end ? (start + ' - ' + end)
-                          : (start || end || 'Selected time slot');
-            ul.appendChild(
-              createEl('li', { id: 'hcf-timeslot-line' }, ['Time: ' + tsLabel])
-            );
-          }
-        }
+        
+        // Insert selected timeslot if available
+if (state.timeslots.length && state.selectedTimeslotIndex !== null) {
+  var ts = state.timeslots[state.selectedTimeslotIndex];
+  if (ts && ts.start_time && ts.end_time) {
+    ul.appendChild(createEl('li', null, [
+      'Time: ' + ts.start_time + ' - ' + ts.end_time
+    ]));
+  }
+}
 
         if (s.details) {
-          var tmp2 = document.createElement('div');
-          tmp2.innerHTML = s.details;
-          ul.appendChild(createEl('li', null, ['Details: ' + tmp2.textContent]));
+          var tmp = document.createElement('div');
+          tmp.innerHTML = s.details;
+          ul.appendChild(createEl('li', null, ['Details: ' + tmp.textContent]));
         }
-
         if (s.price && s.price.total) {
           var p = document.createElement('div');
           p.innerHTML = s.price.total;
@@ -1237,7 +652,7 @@
         availabilityBox.appendChild(ul);
       }
 
-      bookingForm.style.display = 'block';
+      bookingForm.style.display = state.slip ? 'block' : 'none';
 
       debugBox.style.display = 'block';
       debugBox.textContent = 'Rated response from Checkfront:\n\n' + JSON.stringify(data, null, 2);
@@ -1257,38 +672,16 @@
             state.slip = m[1] + state.timeslots[idx].start_time + m[3];
           }
         }
-
-        // Also update the visible "Time" line in the availability summary
-        var ts = state.timeslots[idx];
-        if (ts) {
-          var start = ts.start_time || '';
-          var end   = ts.end_time   || '';
-          var label = start && end ? (start + ' - ' + end)
-                     : (start || end || 'Selected time slot');
-          var timeLi = document.getElementById('hcf-timeslot-line');
-          if (timeLi) {
-            timeLi.textContent = 'Time: ' + label;
-          }
-        }
-
-        if (timeslotDropdown) {
-          timeslotDropdown.value = String(idx);
-        }
       });
     }
 
     // === "Check Availability & Price" click ===
     checkBtn.addEventListener('click', function() {
       if (!dateInput.value) {
-        alert('Please choose a check-in date.');
-        return;
-      }
-      if (!endDateInput.value) {
-        alert('Please choose a check-out date.');
+        alert('Please choose a date.');
         return;
       }
       var dateYmd = dateInput.value.replace(/-/g, '');
-      var endYmd = endDateInput.value.replace(/-/g, '');
       var qty = state.qty;
 
       setLoading(true);
@@ -1296,7 +689,6 @@
       var url = HowsteanCheckfront.restBase +
         'item-rated?item_id=' + encodeURIComponent(state.itemId) +
         '&date=' + encodeURIComponent(dateYmd) +
-        '&end_date=' + encodeURIComponent(endYmd) +
         '&qty=' + encodeURIComponent(qty);
 
       fetch(url, {
@@ -1327,128 +719,64 @@
         return;
       }
 
-      var formPayload = {};
-      var staticMissing = [];
+      function v(id) {
+        var el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+      }
 
-      var staticFields = [
-        { id: 'hcf-first-name', key: 'customer_first_name', label: 'First Name', required: true },
-        { id: 'hcf-last-name', key: 'customer_last_name', label: 'Surname', required: true },
-        { id: 'hcf-email', key: 'customer_email', label: 'E-mail', required: true },
-        { id: 'hcf-phone', key: 'customer_phone', label: 'Phone', required: true },
-        { id: 'hcf-company', key: 'customer_company', label: 'Company Name', required: false },
-        { id: 'hcf-address', key: 'customer_address', label: 'First Line Billing Address', required: true },
-        { id: 'hcf-city', key: 'customer_city', label: 'Town/City', required: true },
-        { id: 'hcf-postal', key: 'customer_postal_zip', label: 'Postal / Zip', required: true },
-        { id: 'hcf-country', key: 'customer_country', label: 'Country', required: true },
-        { id: 'hcf-county', key: 'customer_province', label: 'County', required: true },
-        { id: 'hcf-hear', key: 'how_did_you_hear_about_us', label: 'How Did You Hear About Us?', required: true },
-        { id: 'hcf-other', key: 'other_please_specify', label: 'Other (please specify)', required: false },
-        { id: 'hcf-search', key: 'search_engine_google_yahoo_etc', label: 'Search Engine Term', required: false },
-        { id: 'hcf-guest-type', key: 'guest_type', label: 'Guest Type', required: true },
-        { id: 'hcf-email-optin', key: 'customer_email_optin', label: 'Marketing Opt-in', required: false, type: 'checkbox' },
-      ];
+      var firstName = v('hcf-first-name');
+      var lastName  = v('hcf-last-name');
+      var phone     = v('hcf-phone');
+      var company   = v('hcf-company');
+      var address   = v('hcf-address');
+      var city      = v('hcf-city');
+      var postal    = v('hcf-postal');
+      var country   = v('hcf-country');
+      var county    = countySelect.value;
+      var hear      = hearSelect.value;
+      var other     = v('hcf-other');
+      var search    = v('hcf-search');
+      var guestType = guestSelect.value;
+      var tcChecked = document.getElementById('hcf-tc') ? document.getElementById('hcf-tc').checked : false;
+      var emailOptinChecked = document.getElementById('hcf-email-optin') ? document.getElementById('hcf-email-optin').checked : false;
 
-staticFields.forEach(function(fieldDef) {
-  var el = document.getElementById(fieldDef.id);
-  if (!el) return;
-  var val;
-  if ((fieldDef.type || el.type) === 'checkbox') {
-    val = el.checked ? '1' : '';
-  } else {
-    val = (el.value || '').trim();
-  }
-  if (fieldDef.required && !val) {
-    staticMissing.push(fieldDef.label || fieldDef.key);
-  }
-  if (val !== '') {
-    formPayload[fieldDef.key] = val;
-  }
-});
+      var email = v('hcf-email');
 
-var tcChecked = document.getElementById('hcf-tc')
-  ? document.getElementById('hcf-tc').checked
-  : false;
-
-if (!tcChecked) {
-  staticMissing.push('Terms of Service agreement');
-}
-
-formPayload.tc = tcChecked ? '1' : '0';
-formPayload.customer_tos_agree = tcChecked ? '1' : '0';
-
-
-      var formFields = dynamicFieldsContainer ? dynamicFieldsContainer.querySelectorAll('[data-field-name]') : [];
-      var grouped = {};
-
-      Array.prototype.forEach.call(formFields, function(el) {
-        var name = el.getAttribute('data-field-name');
-        if (!grouped[name]) grouped[name] = [];
-        grouped[name].push(el);
-      });
-
-      Object.keys(grouped).forEach(function(name) {
-        var inputs = grouped[name];
-        if (!inputs.length) return;
-
-        var first = inputs[0];
-        var tag = first.tagName.toLowerCase();
-        var type = (first.getAttribute('type') || '').toLowerCase();
-        var required = first.required || first.getAttribute('data-field-required') === '1';
-
-        var value = '';
-
-        if (inputs.length > 1) {
-          if (type === 'radio') {
-            inputs.forEach(function(el) {
-              if (el.checked) value = el.value;
-            });
-          } else {
-            var selected = [];
-            inputs.forEach(function(el) {
-              var elType = (el.getAttribute('type') || '').toLowerCase();
-              if (elType === 'checkbox' && el.checked) {
-                selected.push(el.value || '1');
-              }
-            });
-            value = selected.length > 1 ? selected : (selected[0] || '');
-          }
-        } else if (tag === 'select') {
-          if (first.multiple) {
-            var chosen = [];
-            Array.prototype.forEach.call(first.options, function(opt) {
-              if (opt.selected && opt.value) {
-                chosen.push(opt.value);
-              }
-            });
-            value = chosen.length > 1 ? chosen : (chosen[0] || '');
-          } else {
-            value = first.value;
-          }
-        } else if (type === 'checkbox') {
-          value = first.checked ? (first.value || '1') : '';
-        } else {
-          value = (first.value || '').trim();
-        }
-
-        if (required && (!value || (Array.isArray(value) && value.length === 0))) {
-          staticMissing.push(name);
-        }
-
-        formPayload[name] = value;
-      });
-
-      if (staticMissing.length) {
-        alert('Please fill in all required fields: ' + staticMissing.join(', '));
+      if (!firstName || !lastName || !email || !phone || !address || !city || !postal || !country || !county || !hear || !guestType) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+      if (hear === 'other' && !other) {
+        alert('Please specify how you heard about us.');
+        return;
+      }
+      if (!tcChecked) {
+        alert('You must agree to the Terms & Conditions.');
         return;
       }
 
-      var tosAgreed = tcChecked || formPayload.customer_tos_agree === '1' || formPayload.customer_tos_agree === 1 || formPayload.customer_tos_agree === true;
-
       var payload = {
-        policy: { customer_tos_agree: tosAgreed ? 1 : 0 },
+        policy: { customer_tos_agree: tcChecked ? 1 : 0 },
         slip: state.slip,
-        customer_tos_agree: tosAgreed ? 1 : 0,
-        form: formPayload
+        customer_tos_agree: tcChecked ? 1 : 0,
+        form: {
+          customer_first_name: firstName,
+          customer_last_name:  lastName,
+          customer_email:      email,
+          customer_phone:      phone,
+          company_name:        company,
+          customer_address:    address,
+          customer_city:       city,
+          customer_country:    country,
+          customer_region:     county,
+          customer_postal_zip: postal,
+          how_did_you_hear_about_us: hear,
+          other_please_specify: other,
+          search_engine_google_yahoo_etc: search,
+          guest_type: guestType,
+          customer_email_optin: emailOptinChecked ? '1' : '0',
+          customer_tos_agree: tcChecked ? '1' : '0'
+        }
       };
 
       setLoading(true);
@@ -1533,3 +861,5 @@ formPayload.customer_tos_agree = tcChecked ? '1' : '0';
     renderApp(root, itemId);
   });
 })();
+
+// patched
